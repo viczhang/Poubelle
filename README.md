@@ -26,8 +26,8 @@ A simple web application for securely sharing images with password protection.
 3. Access the admin area:
    - URL: http://localhost:5000/login
    - Default credentials: 
-     - Username: admin
-     - Password: admin
+     - Username: `admin`
+     - Password: `admin`
 
 ## Usage
 
@@ -38,4 +38,65 @@ A simple web application for securely sharing images with password protection.
 
 ## Security Note
 
-For production use, please change the default admin password and set a proper SECRET_KEY environment variable.
+## Docker Compose Deployment
+
+Use Docker Compose to run the app on your server:
+
+1. Create an `.env` file next to `docker-compose.yml` (optional but recommended):
+   ```bash
+   echo "ADMIN_PASSWORD=SuperSecure!123" > .env
+   ```
+
+2. Review `docker-compose.yml`:
+   - The service exposes `5000` on the host
+   - Persists data via volumes:
+     - `./static/uploads:/app/static/uploads`
+     - `./imageshare.db:/app/imageshare.db`
+   - Supports admin password via environment:
+     ```yaml
+     environment:
+       FLASK_ENV: production
+       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+     command: python run.py
+     ```
+
+3. Build and start:
+   ```bash
+   docker compose up -d --build
+   ```
+
+4. Check logs and status:
+   ```bash
+   docker compose logs -f
+   docker compose ps
+   ```
+
+5. Access the app:
+   - `http://<your-server-ip>:5000` or your domain if reverse-proxied
+
+6. Stop or update:
+   ```bash
+   docker compose down
+   docker compose pull && docker compose up -d
+   ```
+
+### Notes
+- The container’s default admin credentials are `admin` / `admin` unless `ADMIN_PASSWORD` is set.
+- The container now uses `run.py` (SQLAlchemy app) by default for persistence and avoids `app.py`’s reinitialization behavior.
+
+## Environment Variables
+
+- `ADMIN_PASSWORD`: Sets the initial admin password at app startup when the admin user is created.
+  - Default: `admin`
+  - Example (Linux/macOS):
+    ```bash
+    export ADMIN_PASSWORD="SuperSecure!123"
+    python run.py
+    ```
+
+- `SECRET_KEY`: Flask secret key used for sessions.
+  - Default: development key
+  - Set a strong value in production.
+
+**Data Initialization**
+- In `app.py`, the database is reinitialized on first request, which recreates the admin user using `ADMIN_PASSWORD`. Use `run.py` (SQLAlchemy app) to avoid dropping data, or remove the reinitialization logic in `app.py` for production.

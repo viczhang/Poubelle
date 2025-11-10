@@ -38,7 +38,9 @@ def create_app():
         from app.models import User
         if not User.query.filter_by(username='admin').first():
             admin = User(username='admin')
-            admin.set_password('admin')  # Default password, should be changed
+            import os
+            admin_password = os.environ.get('ADMIN_PASSWORD', 'admin')
+            admin.set_password(admin_password)
             db.session.add(admin)
             db.session.commit()
     

@@ -8,6 +8,18 @@
     <a href="{{ url_for('admin.upload') }}" class="btn btn-primary">Upload New Images</a>
 </div>
 
+{% if new_url %}
+<div class="alert alert-success">
+    <div class="d-flex align-items-center gap-2">
+        <span class="me-2">New share URL:</span>
+        <div class="input-group">
+            <input type="text" class="form-control" id="newAdminShareUrl" value="{{ new_url }}" readonly>
+            <button class="btn btn-outline-secondary" type="button" onclick="copyAdminNewUrl(this)">Copy URL</button>
+        </div>
+    </div>
+    </div>
+{% endif %}
+
 <div class="row">
     {% if shares %}
         {% for share in shares %}
@@ -35,4 +47,45 @@
         </div>
     {% endif %}
 </div>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Change Admin Password</h5>
+                <form method="POST">
+                    <input type="hidden" name="action" value="change_admin_password">
+                    <div class="mb-3">
+                        <label for="new_admin_password" class="form-label">New Password</label>
+                        <input type="password" class="form-control" id="new_admin_password" name="new_admin_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_admin_password" class="form-label">Confirm New Password</label>
+                        <input type="password" class="form-control" id="confirm_admin_password" name="confirm_admin_password" required>
+                    </div>
+                    <button type="submit" class="btn btn-warning">Update Admin Password</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyAdminNewUrl(button) {
+    const input = document.getElementById('newAdminShareUrl');
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(input.value).then(() => {
+            button.textContent = 'Copied!';
+            setTimeout(() => button.textContent = 'Copy URL', 2000);
+        });
+    } else {
+        input.select();
+        document.execCommand('copy');
+        button.textContent = 'Copied!';
+        setTimeout(() => button.textContent = 'Copy URL', 2000);
+    }
+}
+</script>
 {% endblock %}

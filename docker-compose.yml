@@ -11,5 +11,13 @@ services:
       - ./static/uploads:/app/static/uploads
       - ./imageshare.db:/app/imageshare.db
     environment:
-      - FLASK_APP=app.py
-      - FLASK_ENV=production
+      FLASK_ENV: production
+      # Set admin password via environment; defaults to 'admin' if not provided
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+    command: python run.py
+    networks:
+      - caddy_default
+
+networks:
+  caddy_default:
+    external: true

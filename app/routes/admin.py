@@ -11,11 +11,28 @@ admin = Blueprint('admin', __name__)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
 
-@admin.route('/dashboard')
+@admin.route('/dashboard', methods=['GET', 'POST'])
 @login_required
 def dashboard():
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'change_admin_password':
+            new_password = request.form.get('new_admin_password')
+            confirm_password = request.form.get('confirm_admin_password')
+
+            if not new_password:
+                flash('Please enter a new admin password')
+            elif new_password != confirm_password:
+                flash('Admin passwords do not match')
+            else:
+                current_user.set_password(new_password)
+                db.session.commit()
+                flash('Admin password updated successfully')
+        return redirect(url_for('admin.dashboard'))
+
+    new_url = request.args.get('new_url')
     shares = ImageShare.query.filter_by(user_id=current_user.id).all()
-    return render_template('admin/dashboard.html', shares=shares)
+    return render_template('admin/dashboard.html', shares=shares, new_url=new_url)
 
 @admin.route('/upload', methods=['GET', 'POST'])
 @login_required
@@ -24,8 +41,8 @@ def upload():
         title = request.form.get('title')
         password = request.form.get('password')
         
-        if not title or not password:
-            flash('Title and password are required')
+        if not title:
+            flash('Title is required')
             return redirect(url_for('admin.upload'))
         
         files = request.files.getlist('images')
@@ -53,8 +70,7 @@ def upload():
                 db.session.add(image)
         
         db.session.commit()
-        flash(f'Share created with URL: {url_for("share.view", share_id=share.share_id, _external=True)}')
-        return redirect(url_for('admin.dashboard'))
+        return redirect(url_for('admin.dashboard', new_url=url_for('share.view', share_id=share.share_id, _external=True)))
     
     return render_template('admin/upload.html')
 
@@ -108,5 +124,7 @@ def manage(share_id):
                 db.session.delete(image)
                 db.session.commit()
                 flash('Image deleted successfully')
+
+        
     
     return render_template('admin/manage.html', share=share)

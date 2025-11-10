@@ -13,11 +13,10 @@ COPY . .
 RUN mkdir -p static/uploads && chmod 777 static/uploads
 
 # Set environment variables
-ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 
 # Expose port
 EXPOSE 5000
 
-# Run the application
-CMD ["python", "app.py"]
+# Run the application (SQLAlchemy variant)
+CMD ["python", "run.py"]

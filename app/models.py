@@ -26,9 +26,14 @@ class ImageShare(db.Model):
     images = db.relationship('Image', backref='share', lazy='dynamic', cascade='all, delete-orphan')
     
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+        if password:
+            self.password_hash = generate_password_hash(password)
+        else:
+            self.password_hash = None
         
     def check_password(self, password):
+        if not self.password_hash:
+            return True
         return check_password_hash(self.password_hash, password)
 
 class Image(db.Model):

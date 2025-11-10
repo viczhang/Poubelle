@@ -69,9 +69,10 @@ def init_db():
     
     # Create admin user
     cursor = db.cursor()
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'admin')
     cursor.execute(
         "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-        ('admin', generate_password_hash('admin'))
+        ('admin', generate_password_hash(admin_password))
     )
     db.commit()
 
@@ -120,13 +121,34 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/')
-@app.route('/dashboard')
+@app.route('/dashboard', methods=['GET', 'POST'])
 @login_required
 def dashboard():
     db = get_db()
+    new_url = request.args.get('new_url')
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'change_admin_password':
+            new_password = request.form.get('new_admin_password')
+            confirm_password = request.form.get('confirm_admin_password')
+
+            if not new_password:
+                flash('Please enter a new admin password')
+            elif new_password != confirm_password:
+                flash('Admin passwords do not match')
+            else:
+                db.execute(
+                    'UPDATE users SET password_hash = ? WHERE id = ?',
+                    (generate_password_hash(new_password), session['user_id'])
+                )
+                db.commit()
+                flash('Admin password updated successfully')
+
+        return redirect(url_for('dashboard'))
+
     shares = db.execute('SELECT * FROM image_shares WHERE user_id = ? ORDER BY created_at DESC', 
                       (session['user_id'],)).fetchall()
-    return render_template('dashboard.html', shares=shares)
+    return render_template('dashboard.html', shares=shares, new_url=new_url)
 
 @app.route('/upload', methods=['GET', 'POST'])
 @login_required
@@ -135,8 +157,8 @@ def upload():
         title = request.form.get('title')
         password = request.form.get('password')
         
-        if not title or not password:
-            flash('Title and password are required')
+        if not title:
+            flash('Title is required')
             return redirect(url_for('upload'))
         
         files = request.files.getlist('images')
@@ -155,7 +177,7 @@ def upload():
             
         cursor.execute(
             'INSERT INTO image_shares (share_id, title, password_hash, user_id) VALUES (?, ?, ?, ?)',
-            (share_id, title, generate_password_hash(password), session['user_id'])
+            (share_id, title, generate_password_hash(password) if password else '', session['user_id'])
         )
         share_db_id = cursor.lastrowid
         
@@ -173,8 +195,8 @@ def upload():
                 )
         
         db.commit()
-        flash(f'Share created with URL: {url_for("view_share", share_id=share_id, _external=True)}')
-        return redirect(url_for('dashboard'))
+        share_url = url_for("view_share", share_id=share_id, _external=True)
+        return redirect(url_for('dashboard', new_url=share_url))
     
     return render_template('upload.html')
 
@@ -234,6 +256,8 @@ def manage(share_id):
                 db.execute('DELETE FROM images WHERE id = ?', (image_id,))
                 db.commit()
                 flash('Image deleted successfully')
+
+        
     
     images = db.execute('SELECT * FROM images WHERE share_id = ?', (share_id,)).fetchall()
     return render_template('manage.html', share=share, images=images)
@@ -245,6 +269,11 @@ def view_share(share_id):
     
     if not share:
         return "Share not found", 404
+    
+    # If share has no password, show directly
+    if not share['password_hash']:
+        images = db.execute('SELECT * FROM images WHERE share_id = ?', (share['id'],)).fetchall()
+        return render_template('view.html', share=share, images=images)
     
     # Check if already authenticated for this share
     if session.get(f'share_auth_{share_id}'):
