@@ -23,7 +23,7 @@
                     <div class="mb-3">
                         <label class="form-label">Share URL</label>
                         <div class="input-group">
-                            <input type="text" class="form-control" value="{{ url_for('view_share', share_id=share.share_id, _external=True) }}" readonly>
+                            <input type="text" class="form-control" value="{{ url_for('view_share', share_id=share.share_id, _external=True, _scheme='https') }}" readonly>
                             <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard(this)">Copy</button>
                         </div>
                     </div>

@@ -121,6 +121,65 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/')
+# 简单的测试路由，用于直接删除所有共享
+@app.route('/test_delete_all', methods=['POST'])
+@login_required
+def test_delete_all():
+    # Check confirmation text
+    confirm_text = request.form.get('confirm_text', '')
+    if confirm_text.upper() != 'DELETE':
+        flash('Invalid confirmation text. Please type "DELETE" exactly.')
+        return redirect(url_for('dashboard'))
+    
+    db = get_db()
+    # Get all shares for the current user
+    shares = db.execute('SELECT id FROM image_shares WHERE user_id = ?', 
+                      (session['user_id'],)).fetchall()
+    
+    if shares:
+        # Get all images for these shares
+        share_ids = [share['id'] for share in shares]
+        if share_ids:
+            # Get all image filenames to delete
+            images = db.execute(
+                'SELECT filename FROM images WHERE share_id IN ({})'.format(
+                    ','.join(['?'] * len(share_ids))
+                ),
+                share_ids
+            ).fetchall()
+            
+            # Delete image files from filesystem
+            for image in images:
+                try:
+                    os.remove(os.path.join(app.config['UPLOAD_FOLDER'], image['filename']))
+                except Exception as e:
+                    print(f"Error deleting file {image['filename']}: {e}")
+            
+            # Delete all images associated with these shares
+            db.execute(
+                'DELETE FROM images WHERE share_id IN ({})'.format(
+                    ','.join(['?'] * len(share_ids))
+                ),
+                share_ids
+            )
+            
+            # Delete all shares
+            db.execute(
+                'DELETE FROM image_shares WHERE id IN ({})'.format(
+                    ','.join(['?'] * len(share_ids))
+                ),
+                share_ids
+            )
+            
+            db.commit()
+            flash('All shares and associated files have been deleted')
+        else:
+            flash('No shares found to delete')
+    else:
+        flash('No shares found to delete')
+    
+    return redirect(url_for('dashboard'))
+
 @app.route('/dashboard', methods=['GET', 'POST'])
 @login_required
 def dashboard():
@@ -128,6 +187,7 @@ def dashboard():
     new_url = request.args.get('new_url')
     if request.method == 'POST':
         action = request.form.get('action')
+        
         if action == 'change_admin_password':
             new_password = request.form.get('new_admin_password')
             confirm_password = request.form.get('confirm_admin_password')
@@ -143,6 +203,54 @@ def dashboard():
                 )
                 db.commit()
                 flash('Admin password updated successfully')
+        
+        elif action == 'delete_all_shares':
+            # Get all shares for the current user
+            shares = db.execute('SELECT id FROM image_shares WHERE user_id = ?', 
+                              (session['user_id'],)).fetchall()
+            
+            if shares:
+                # Get all images for these shares
+                share_ids = [share['id'] for share in shares]
+                if share_ids:
+                    # Get all image filenames to delete
+                    images = db.execute(
+                        'SELECT filename FROM images WHERE share_id IN ({})'.format(
+                            ','.join(['?'] * len(share_ids))
+                        ),
+                        share_ids
+                    ).fetchall()
+                    
+                    # Delete image files from filesystem
+                    for image in images:
+                        try:
+                            os.remove(os.path.join(app.config['UPLOAD_FOLDER'], image['filename']))
+                        except Exception as e:
+                            # Log error but continue with other deletions
+                            print(f"Error deleting file {image['filename']}: {e}")
+                    
+                    # Delete all images associated with these shares
+                    db.execute(
+                        'DELETE FROM images WHERE share_id IN ({})'.format(
+                            ','.join(['?'] * len(share_ids))
+                        ),
+                        share_ids
+                    )
+                    
+                    # Delete all shares
+                    db.execute(
+                        'DELETE FROM image_shares WHERE id IN ({})'.format(
+                            ','.join(['?'] * len(share_ids))
+                        ),
+                        share_ids
+                    )
+                    
+                    db.commit()
+                    flash('All shares and associated files have been deleted')
+                else:
+                    flash('No shares found to delete')
+            else:
+                flash('No shares found to delete')
 
         return redirect(url_for('dashboard'))
 
@@ -195,7 +303,7 @@ def upload():
                 )
         
         db.commit()
-        share_url = url_for("view_share", share_id=share_id, _external=True)
+        share_url = url_for("view_share", share_id=share_id, _external=True, _scheme='https')
         return redirect(url_for('dashboard', new_url=share_url))
     
     return render_template('upload.html')

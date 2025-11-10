@@ -34,6 +34,43 @@ def dashboard():
     shares = ImageShare.query.filter_by(user_id=current_user.id).all()
     return render_template('admin/dashboard.html', shares=shares, new_url=new_url)
 
+@admin.route('/delete_all_shares', methods=['POST'])
+@login_required
+def delete_all_shares():
+    confirm_text = request.form.get('confirm_text', '').strip().upper()
+    
+    if confirm_text != 'DELETE':
+        flash('Confirmation text does not match. Deletion cancelled.')
+        return redirect(url_for('admin.dashboard'))
+    
+    # Get all shares for the current user
+    shares = ImageShare.query.filter_by(user_id=current_user.id).all()
+    
+    if not shares:
+        flash('No shares to delete.')
+        return redirect(url_for('admin.dashboard'))
+    
+    try:
+        # Delete all associated images and their files
+        for share in shares:
+            for image in share.images:
+                # Delete the image file if it exists
+                image_path = os.path.join(current_app.config['UPLOAD_FOLDER'], image.filename)
+                if os.path.exists(image_path):
+                    os.remove(image_path)
+                # Delete the image record
+                db.session.delete(image)
+            # Delete the share record
+            db.session.delete(share)
+        
+        db.session.commit()
+        flash('All shares have been successfully deleted.')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting shares: {str(e)}')
+    
+    return redirect(url_for('admin.dashboard'))
+
 @admin.route('/upload', methods=['GET', 'POST'])
 @login_required
 def upload():
@@ -70,7 +107,7 @@ def upload():
                 db.session.add(image)
         
         db.session.commit()
-        return redirect(url_for('admin.dashboard', new_url=url_for('share.view', share_id=share.share_id, _external=True)))
+        return redirect(url_for('admin.dashboard', new_url=url_for('share.view', share_id=share.share_id, _external=True, _scheme='https')))
     
     return render_template('admin/upload.html')
 

@@ -8,6 +8,18 @@
     <a href="{{ url_for('admin.upload') }}" class="btn btn-primary">Upload New Images</a>
 </div>
 
+<!-- Delete All Shares Section -->
+<div style="background-color: red; padding: 20px; margin: 10px 0; border-radius: 5px;">
+    <h3 style="color: white; margin: 0; font-weight: bold;">DELETE ALL SHARES</h3>
+    <form action="{{ url_for('admin.delete_all_shares') }}" method="POST" style="margin-top: 15px;">
+        <div style="margin: 10px 0;">
+            <label style="color: white; font-weight: bold;">Type "DELETE" to confirm: </label>
+            <input type="text" name="confirm_text" required class="form-control" style="max-width: 200px; margin-top: 5px;">
+        </div>
+        <input type="submit" value="DELETE ALL SHARES" style="padding: 10px 20px; background-color: black; color: white; border: none; cursor: pointer;">
+    </form>
+</div>
+
 {% if new_url %}
 <div class="alert alert-success">
     <div class="d-flex align-items-center gap-2">

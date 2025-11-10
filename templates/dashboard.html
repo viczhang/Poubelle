@@ -3,9 +3,22 @@
 {% block title %}Dashboard - Poubelle{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex flex-column gap-3 mb-4">
     <h1>Your Image Shares</h1>
-    <a href="{{ url_for('upload') }}" class="btn btn-primary">Create New Share</a>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('upload') }}" class="btn btn-primary">Create New Share</a>
+    </div>
+    <!-- 简单的HTML表单，直接提交到测试路由 -->
+    <div style="background-color: red; padding: 20px; margin: 10px 0;">
+        <h3 style="color: white; margin: 0;">DELETE ALL SHARES</h3>
+        <form action="{{ url_for('test_delete_all') }}" method="POST">
+            <div style="margin: 10px 0;">
+                <label style="color: white;">Type "DELETE" to confirm: </label>
+                <input type="text" name="confirm_text" required>
+            </div>
+            <input type="submit" value="DELETE ALL SHARES" style="padding: 10px 20px; background-color: black; color: white;">
+        </form>
+    </div>
 </div>
 
 {% if new_url %}
@@ -84,6 +97,50 @@ function copyNewUrl(button) {
         document.execCommand('copy');
         button.textContent = 'Copied!';
         setTimeout(() => button.textContent = 'Copy URL', 2000);
+    }
+}
+
+// 添加日志输出以便调试
+console.log('Dashboard page loaded');
+console.log('Delete button exists:', document.getElementById('deleteAllBtn') !== null);
+
+// 为删除按钮添加事件监听器
+window.onload = function() {
+    const deleteBtn = document.getElementById('deleteAllBtn');
+    console.log('Window loaded, delete button:', deleteBtn);
+    
+    if (deleteBtn) {
+        deleteBtn.onclick = function() {
+            console.log('Delete button clicked');
+            
+            // First confirmation
+            if (!confirm('WARNING: This will delete ALL your image shares and their associated files permanently. This action cannot be undone!')) {
+                console.log('First confirmation cancelled');
+                return;
+            }
+            
+            // Second confirmation with text input
+            const confirmText = prompt('Type "DELETE" exactly to confirm:');
+            if (confirmText && confirmText.toUpperCase() === 'DELETE') {
+                console.log('Second confirmation successful, submitting form');
+                // Create a form and submit it
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '{{ url_for("dashboard") }}';
+                
+                const actionInput = document.createElement('input');
+                actionInput.type = 'hidden';
+                actionInput.name = 'action';
+                actionInput.value = 'delete_all_shares';
+                form.appendChild(actionInput);
+                
+                document.body.appendChild(form);
+                form.submit();
+            } else {
+                console.log('Second confirmation failed');
+                alert('Deletion cancelled. Text did not match "DELETE".');
+            }
+        };
     }
 }
 </script>
