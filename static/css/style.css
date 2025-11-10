@@ -11,6 +11,29 @@ body {
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
+/* Ensure no fonts are bigger than the site title */
+h1 {
+    font-size: 1.75rem !important;
+}
+
+h2 {
+    font-size: 1.5rem !important;
+}
+
+h3 {
+    font-size: 1.25rem !important;
+}
+
+h4 {
+    font-size: 1.125rem !important;
+}
+
+/* Ensure the navbar brand is the largest text */
+.navbar-brand {
+    font-size: 1.75rem !important;
+    font-weight: 600 !important;
+}
+
 .gallery-item {
     transition: transform 0.3s;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);

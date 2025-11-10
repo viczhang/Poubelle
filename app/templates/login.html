@@ -5,6 +5,13 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-6">
+        <!-- Upload button for anonymous users -->
+        {% if not current_user.is_authenticated %}
+        <div class="mb-4 text-center">
+            <a href="{{ url_for('admin.upload') }}" class="btn btn-success">Upload Images to Share</a>
+        </div>
+        {% endif %}
+        
         <div class="card">
             <div class="card-header">
                 <h3 class="text-center">Admin Login</h3>

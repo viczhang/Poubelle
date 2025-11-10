@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Successful - {{ config.SITE_TITLE }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Upload Successful!</h1>
+    <div class="alert alert-success mt-4">
+        <div class="d-flex align-items-center gap-2">
+            <span class="me-2">New share URL:</span>
+            <div class="input-group flex-1">
+                <input type="text" class="form-control" id="newShareUrl" value="{{ new_url }}" readonly>
+                <button class="btn btn-outline-secondary" type="button" onclick="copyShareUrl(this)">Copy URL</button>
+            </div>
+        </div>
+    </div>
+    <p class="mt-4"><a href="{{ url_for('admin.upload') }}" class="btn btn-primary">Create Another Share</a></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyShareUrl(button) {
+    const input = document.getElementById('newShareUrl');
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(input.value).then(() => {
+            button.textContent = 'Copied!';
+            setTimeout(() => button.textContent = 'Copy URL', 2000);
+        });
+    } else {
+        input.select();
+        document.execCommand('copy');
+        button.textContent = 'Copied!';
+        setTimeout(() => button.textContent = 'Copy URL', 2000);
+    }
+}
+</script>
+{% endblock %}

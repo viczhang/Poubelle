@@ -9,14 +9,14 @@
         <a href="{{ url_for('upload') }}" class="btn btn-primary">Create New Share</a>
     </div>
     <!-- 简单的HTML表单，直接提交到测试路由 -->
-    <div style="background-color: red; padding: 20px; margin: 10px 0;">
-        <h3 style="color: white; margin: 0;">DELETE ALL SHARES</h3>
-        <form action="{{ url_for('test_delete_all') }}" method="POST">
-            <div style="margin: 10px 0;">
-                <label style="color: white;">Type "DELETE" to confirm: </label>
-                <input type="text" name="confirm_text" required>
+    <div class="bg-danger text-white p-4 my-3">
+        <h3 class="mb-0">DELETE ALL SHARES</h3>
+        <form action="{{ url_for('test_delete_all') }}" method="POST" class="mt-3">
+            <div class="mb-3">
+                <label>Type "DELETE" to confirm: </label>
+                <input type="text" name="confirm_text" required class="form-control mt-1">
             </div>
-            <input type="submit" value="DELETE ALL SHARES" style="padding: 10px 20px; background-color: black; color: white;">
+            <button type="submit" class="btn btn-dark">DELETE ALL SHARES</button>
         </form>
     </div>
 </div>

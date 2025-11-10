@@ -31,7 +31,8 @@ def dashboard():
         return redirect(url_for('admin.dashboard'))
 
     new_url = request.args.get('new_url')
-    shares = ImageShare.query.filter_by(user_id=current_user.id).all()
+    # For admin users, show all shares ordered by creation date (newest first)
+    shares = ImageShare.query.order_by(ImageShare.created_at.desc()).all()
     return render_template('admin/dashboard.html', shares=shares, new_url=new_url)
 
 @admin.route('/delete_all_shares', methods=['POST'])
@@ -43,8 +44,11 @@ def delete_all_shares():
         flash('Confirmation text does not match. Deletion cancelled.')
         return redirect(url_for('admin.dashboard'))
     
-    # Get all shares for the current user
-    shares = ImageShare.query.filter_by(user_id=current_user.id).all()
+    # Admin users can delete all shares, regular users can only delete their own shares
+    if current_user.username == 'admin':
+        shares = ImageShare.query.all()
+    else:
+        shares = ImageShare.query.filter_by(user_id=current_user.id).all()
     
     if not shares:
         flash('No shares to delete.')
@@ -72,7 +76,6 @@ def delete_all_shares():
     return redirect(url_for('admin.dashboard'))
 
 @admin.route('/upload', methods=['GET', 'POST'])
-@login_required
 def upload():
     if request.method == 'POST':
         title = request.form.get('title')
@@ -87,7 +90,9 @@ def upload():
             flash('No images selected')
             return redirect(url_for('admin.upload'))
         
-        share = ImageShare(title=title, user_id=current_user.id)
+        # For non-logged in users, user_id will be None
+        user_id = current_user.id if current_user.is_authenticated else None
+        share = ImageShare(title=title, user_id=user_id)
         share.set_password(password)
         db.session.add(share)
         db.session.flush()  # Get the ID without committing
@@ -107,7 +112,14 @@ def upload():
                 db.session.add(image)
         
         db.session.commit()
-        return redirect(url_for('admin.dashboard', new_url=url_for('share.view', share_id=share.share_id, _external=True, _scheme='https')))
+        share_url = url_for('share.view', share_id=share.share_id, _external=True, _scheme='https')
+        
+        # For logged in users, redirect to dashboard with the new URL
+        if current_user.is_authenticated:
+            return redirect(url_for('admin.dashboard', new_url=share_url))
+        else:
+            # For non-logged in users, show a simple success page with just the URL
+            return render_template('admin/upload_success.html', new_url=share_url)
     
     return render_template('admin/upload.html')
 
@@ -118,7 +130,9 @@ def manage(share_id):
     
     share = ImageShare.query.get_or_404(share_id)
     
-    if share.user_id != current_user.id:
+    # Admin users can manage all shares, regular users can only manage their own shares
+    # Default admin username is assumed to be 'admin'
+    if share.user_id != current_user.id and current_user.username != 'admin':
         flash('You do not have permission to manage this share')
         return redirect(url_for('admin.dashboard'))
     

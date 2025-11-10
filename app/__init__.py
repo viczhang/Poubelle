@@ -32,6 +32,17 @@ def create_app():
     app.register_blueprint(admin_blueprint)
     app.register_blueprint(share_blueprint)
     
+    # Root route - redirect based on authentication status
+    @app.route('/')
+    def index():
+        from flask import redirect, url_for
+        from flask_login import current_user
+        
+        if current_user.is_authenticated:
+            return redirect(url_for('admin.dashboard'))
+        else:
+            return redirect(url_for('auth.login'))
+    
     # Catch-all route for @vite/client to prevent 404 errors
     @app.route('/@vite/client')
     def vite_client():
