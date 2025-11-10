@@ -16,9 +16,19 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
       # Set site title via environment; defaults to 'Poubelle' if not provided
       SITE_TITLE: ${SITE_TITLE:-Poubelle}
+      # Ensure Flask is aware it's behind a proxy
+      PROXYFIX_FORCE_ENV: 'true'
+      # Set trusted proxies
+      TRUSTED_PROXIES: '172.16.0.0/12,192.168.0.0/16'
     command: python run.py
     networks:
       - caddy_default
+    # Healthcheck to ensure the service is running
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   caddy_default:

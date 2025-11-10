@@ -42,7 +42,7 @@
                     <h5 class="card-title">{{ share.title }}</h5>
                     <p class="card-text">
                         Created: {{ share.created_at.strftime('%Y-%m-%d %H:%M') }}<br>
-                        Images: {{ share.images.count() }}
+                        Images: {{ share.images.count() }} | Views: {{ share.access_logs.count() }}
                     </p>
                     <div class="d-flex justify-content-between">
                         <a href="{{ url_for('admin.manage', share_id=share.id) }}" class="btn btn-sm btn-info">Manage</a>

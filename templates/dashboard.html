@@ -40,7 +40,7 @@
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">{{ share.title }}</h5>
-                <p class="card-text">Created: {{ share.created_at }}</p>
+                <p class="card-text">Created: {{ share.created_at }}<br>Images: {{ share.images | length }} | Views: {{ share.views_count }}</p>
                 <div class="d-grid gap-2">
                     <a href="{{ url_for('manage', share_id=share.id) }}" class="btn btn-outline-primary">Manage</a>
                     <a href="{{ url_for('view_share', share_id=share.share_id) }}" class="btn btn-outline-secondary" target="_blank">View</a>

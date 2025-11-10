@@ -90,6 +90,23 @@ def upload():
             flash('No images selected')
             return redirect(url_for('admin.upload'))
         
+        # Limit to 10 images per share
+        if len(files) > 10:
+            flash('Maximum 10 images allowed per share')
+            return redirect(url_for('admin.upload'))
+        
+        # Check each file size (5MB limit)
+        for file in files:
+            if file and allowed_file(file.filename):
+                # Get file size
+                file.seek(0, os.SEEK_END)
+                file_size = file.tell()
+                file.seek(0)  # Reset file position
+                
+                if file_size > 5 * 1024 * 1024:  # 5MB in bytes
+                    flash(f'Image {file.filename} exceeds 5MB limit')
+                    return redirect(url_for('admin.upload'))
+        
         # For non-logged in users, user_id will be None
         user_id = current_user.id if current_user.is_authenticated else None
         share = ImageShare(title=title, user_id=user_id)

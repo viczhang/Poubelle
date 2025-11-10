@@ -11,6 +11,7 @@ def view(share_id):
     # No password set: show directly
     if not share.password_hash:
         # Create access log
+        # request.remote_addr will return the real client IP when ProxyFix is properly configured
         log = AccessLog(
             share_id=share.id,
             ip_address=request.remote_addr,
@@ -23,6 +24,7 @@ def view(share_id):
     # Check if already authenticated for this share
     if session.get(f'share_auth_{share_id}'):
         # Create access log
+        # request.remote_addr will return the real client IP when ProxyFix is properly configured
         log = AccessLog(
             share_id=share.id,
             ip_address=request.remote_addr,
@@ -37,6 +39,7 @@ def view(share_id):
         
         if share.check_password(password):
             # Create access log
+            # request.remote_addr will return the real client IP when ProxyFix is properly configured
             log = AccessLog(
                 share_id=share.id,
                 ip_address=request.remote_addr,

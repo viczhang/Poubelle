@@ -8,6 +8,7 @@ from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, g
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Configuration
 app = Flask(__name__)
@@ -15,6 +16,9 @@ app.config['SECRET_KEY'] = 'dev-key-for-testing'
 app.config['DATABASE'] = os.path.join(os.path.dirname(__file__), 'imageshare.db')
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
+
+# Configure ProxyFix to get real client IP addresses behind Caddy
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 # Ensure directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -40,6 +44,7 @@ def init_db():
     DROP TABLE IF EXISTS users;
     DROP TABLE IF EXISTS image_shares;
     DROP TABLE IF EXISTS images;
+    DROP TABLE IF EXISTS access_logs;
     
     CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,6 +68,15 @@ def init_db():
         original_filename TEXT NOT NULL,
         uploaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         share_id INTEGER NOT NULL,
+        FOREIGN KEY (share_id) REFERENCES image_shares (id)
+    );
+    
+    CREATE TABLE access_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        share_id INTEGER NOT NULL,
+        access_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        ip_address TEXT,
+        user_agent TEXT,
         FOREIGN KEY (share_id) REFERENCES image_shares (id)
     );
     ''')
@@ -256,6 +270,17 @@ def dashboard():
 
     shares = db.execute('SELECT * FROM image_shares WHERE user_id = ? ORDER BY created_at DESC', 
                       (session['user_id'],)).fetchall()
+    
+    # Add images count and views count to each share
+    for share in shares:
+        # Count images for this share
+        images_count = db.execute('SELECT COUNT(*) FROM images WHERE share_id = ?', (share['id'],)).fetchone()[0]
+        # Count views (access logs) for this share
+        views_count = db.execute('SELECT COUNT(*) FROM access_logs WHERE share_id = ?', (share['id'],)).fetchone()[0]
+        
+        # Add attributes to the share object
+        share['images'] = []  # Just for template compatibility
+        share['views_count'] = views_count
     return render_template('dashboard.html', shares=shares, new_url=new_url)
 
 @app.route('/upload', methods=['GET', 'POST'])
@@ -273,6 +298,23 @@ def upload():
         if not files or files[0].filename == '':
             flash('No images selected')
             return redirect(url_for('upload'))
+        
+        # Limit to 10 images per share
+        if len(files) > 10:
+            flash('Maximum 10 images allowed per share')
+            return redirect(url_for('upload'))
+        
+        # Check each file size (5MB limit)
+        for file in files:
+            if file and allowed_file(file.filename):
+                # Get file size
+                file.seek(0, os.SEEK_END)
+                file_size = file.tell()
+                file.seek(0)  # Reset file position
+                
+                if file_size > 5 * 1024 * 1024:  # 5MB in bytes
+                    flash(f'Image {file.filename} exceeds 5MB limit')
+                    return redirect(url_for('upload'))
         
         # Create share
         share_id = generate_short_id(3)  # 3-character short ID
@@ -372,19 +414,42 @@ def manage(share_id):
 
 @app.route('/s/<share_id>', methods=['GET', 'POST'])
 def view_share(share_id):
+    # Skip logging for favicon requests
+    if request.path.endswith('/favicon.ico'):
+        return redirect(url_for('static', filename='favicon.ico'))
+    
     db = get_db()
     share = db.execute('SELECT * FROM image_shares WHERE share_id = ?', (share_id,)).fetchone()
     
     if not share:
         return "Share not found", 404
     
-    # If share has no password, show directly
-    if not share['password_hash']:
-        images = db.execute('SELECT * FROM images WHERE share_id = ?', (share['id'],)).fetchall()
-        return render_template('view.html', share=share, images=images)
+    # Check if already authenticated for this share (for password-protected shares)
+    is_authenticated = session.get(f'share_auth_{share_id}')
     
-    # Check if already authenticated for this share
-    if session.get(f'share_auth_{share_id}'):
+    # For non-password protected shares or already authenticated access
+    if not share['password_hash'] or is_authenticated:
+        # Create a unique key for this share view in the session
+        view_key = f'viewed_{share_id}'
+        current_time = datetime.now()
+        
+        # Only log access if this is a new view (not logged in the last 5 minutes)
+        if view_key not in session or (current_time - datetime.fromisoformat(session[view_key])).seconds > 300:
+            # Record the access time in session to prevent duplicates
+            session[view_key] = current_time.isoformat()
+            
+            # Get current timestamp for database
+            db_timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S.%f")
+            
+            # Log access directly here to ensure it only happens once
+            cursor = db.cursor()
+            cursor.execute(
+                'INSERT INTO access_logs (share_id, ip_address, user_agent, access_time) VALUES (?, ?, ?, ?)',
+                (share['id'], request.remote_addr, request.user_agent.string, db_timestamp)
+            )
+            db.commit()
+            print(f"Access logged for share_id {share['id']} at {db_timestamp}")
+        
         images = db.execute('SELECT * FROM images WHERE share_id = ?', (share['id'],)).fetchall()
         return render_template('view.html', share=share, images=images)
     
@@ -393,12 +458,59 @@ def view_share(share_id):
         
         if check_password_hash(share['password_hash'], password):
             session[f'share_auth_{share_id}'] = True
+            
+            # Log access once after successful password authentication
+            current_time = datetime.now()
+            db_timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S.%f")
+            cursor = db.cursor()
+            cursor.execute(
+                'INSERT INTO access_logs (share_id, ip_address, user_agent, access_time) VALUES (?, ?, ?, ?)',
+                (share['id'], request.remote_addr, request.user_agent.string, db_timestamp)
+            )
+            db.commit()
+            print(f"Access logged after password auth for share_id {share['id']} at {db_timestamp}")
+            
+            # Also record in session to prevent duplicates
+            session[f'viewed_{share_id}'] = current_time.isoformat()
+            
             images = db.execute('SELECT * FROM images WHERE share_id = ?', (share['id'],)).fetchall()
             return render_template('view.html', share=share, images=images)
         else:
             flash('Invalid password')
     
     return render_template('password.html', share=share)
+
+def log_access(db, share_id):
+    """Log access to a share, preventing duplicate counts from the same client within a short timeframe"""
+    # Skip logging for favicon or other resource requests
+    if request.path.endswith('/favicon.ico') or request.path.startswith('/static/'):
+        return
+    
+    # Generate a client identifier (simplified approach using IP + user agent)
+    client_id = f"{request.remote_addr}:{hash(request.user_agent.string)}"
+    
+    # Check if this client has accessed this share within the last 5 minutes
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT COUNT(*) FROM access_logs WHERE share_id = ? AND ip_address = ? AND "
+        "datetime(access_time) > datetime('now', '-5 minutes')",
+        (share_id, request.remote_addr)
+    )
+    recent_access_count = cursor.fetchone()[0]
+    
+    # Only log if no recent access from this client
+    if recent_access_count == 0:
+        # Get current timestamp
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        
+        cursor.execute(
+            'INSERT INTO access_logs (share_id, ip_address, user_agent, access_time) VALUES (?, ?, ?, ?)',
+            (share_id, request.remote_addr, request.user_agent.string, current_time)
+        )
+        db.commit()
+        print(f"Access logged for share_id {share_id} from client {client_id} at {current_time}")
+    else:
+        print(f"Skipping duplicate access log for share_id {share_id} from client {client_id}")
 
 # Initialize database before first request
 @app.before_first_request
