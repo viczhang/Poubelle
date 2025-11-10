@@ -6,10 +6,11 @@
 <h1>Admin Dashboard</h1>
 <div class="mb-4">
     <a href="{{ url_for('admin.upload') }}" class="btn btn-primary">Upload New Images</a>
+    <button id="showAdvancedOptions" class="btn btn-secondary ml-2">Show Advanced Options</button>
 </div>
 
-<!-- Delete All Shares Section -->
-<div style="background-color: red; padding: 20px; margin: 10px 0; border-radius: 5px;">
+<!-- Delete All Shares Section - Hidden by default -->
+<div id="deleteAllSection" style="background-color: red; padding: 20px; margin: 10px 0; border-radius: 5px; display: none;">
     <h3 style="color: white; margin: 0; font-weight: bold;">DELETE ALL SHARES</h3>
     <form action="{{ url_for('admin.delete_all_shares') }}" method="POST" style="margin-top: 15px;">
         <div style="margin: 10px 0;">
@@ -32,7 +33,7 @@
     </div>
 {% endif %}
 
-<div class="row">
+<div class="row" id="sharedItemsList">
     {% if shares %}
         {% for share in shares %}
         <div class="col-md-4 mb-4">
@@ -60,7 +61,7 @@
     {% endif %}
 </div>
 
-<div class="row mt-4">
+<div class="row mt-4" id="changePasswordSection" style="display: none;">
     <div class="col-md-4">
         <div class="card">
             <div class="card-body">
@@ -99,5 +100,27 @@ function copyAdminNewUrl(button) {
         setTimeout(() => button.textContent = 'Copy URL', 2000);
     }
 }
+
+// Toggle advanced options visibility
+const showAdvancedBtn = document.getElementById('showAdvancedOptions');
+const deleteAllSection = document.getElementById('deleteAllSection');
+const changePasswordSection = document.getElementById('changePasswordSection');
+const sharedItemsList = document.getElementById('sharedItemsList');
+
+showAdvancedBtn.addEventListener('click', function() {
+    const isVisible = deleteAllSection.style.display !== 'none';
+    
+    if (isVisible) {
+        deleteAllSection.style.display = 'none';
+        changePasswordSection.style.display = 'none';
+        sharedItemsList.style.display = 'block'; // Show shared items when hiding advanced options
+        showAdvancedBtn.textContent = 'Show Advanced Options';
+    } else {
+        deleteAllSection.style.display = 'block';
+        changePasswordSection.style.display = 'block';
+        sharedItemsList.style.display = 'none'; // Hide shared items when showing advanced options
+        showAdvancedBtn.textContent = 'Hide Advanced Options';
+    }
+});
 </script>
 {% endblock %}

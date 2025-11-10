@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session
-from app.models import ImageShare
+from app.models import ImageShare, AccessLog
+from app import db
 
 share = Blueprint('share', __name__)
 
@@ -9,16 +10,41 @@ def view(share_id):
     
     # No password set: show directly
     if not share.password_hash:
+        # Create access log
+        log = AccessLog(
+            share_id=share.id,
+            ip_address=request.remote_addr,
+            user_agent=request.user_agent.string
+        )
+        db.session.add(log)
+        db.session.commit()
         return render_template('share/view.html', share=share)
     
     # Check if already authenticated for this share
     if session.get(f'share_auth_{share_id}'):
+        # Create access log
+        log = AccessLog(
+            share_id=share.id,
+            ip_address=request.remote_addr,
+            user_agent=request.user_agent.string
+        )
+        db.session.add(log)
+        db.session.commit()
         return render_template('share/view.html', share=share)
     
     if request.method == 'POST':
         password = request.form.get('password')
         
         if share.check_password(password):
+            # Create access log
+            log = AccessLog(
+                share_id=share.id,
+                ip_address=request.remote_addr,
+                user_agent=request.user_agent.string
+            )
+            db.session.add(log)
+            db.session.commit()
+            
             session[f'share_auth_{share_id}'] = True
             return render_template('share/view.html', share=share)
         else:

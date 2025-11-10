@@ -50,6 +50,38 @@
 
 {# Admin password change moved to Dashboard #}
 
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Access Logs ({{ share.access_logs.count() }})</h5>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>IP Address</th>
+                        <th>User Agent/OS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in share.access_logs.order_by(AccessLog.access_time.desc()).limit(50) %}
+                    <tr>
+                        <td>{{ log.access_time.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ log.access_time.strftime('%H:%M:%S') }}</td>
+                        <td>{{ log.ip_address }}</td>
+                        <td>{{ log.user_agent }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center">No access logs yet</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <div class="card bg-light">
     <div class="card-body">
         <h5 class="card-title text-danger">Danger Zone</h5>

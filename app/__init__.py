@@ -32,6 +32,13 @@ def create_app():
     app.register_blueprint(admin_blueprint)
     app.register_blueprint(share_blueprint)
     
+    # Catch-all route for @vite/client to prevent 404 errors
+    @app.route('/@vite/client')
+    def vite_client():
+        # Return empty response with 204 No Content status
+        from flask import make_response
+        return make_response('', 204)
+    
     with app.app_context():
         db.create_all()
         

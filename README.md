@@ -7,7 +7,8 @@ A simple web application for securely sharing images with password protection.
 - Password-protected admin area
 - Upload multiple images at once
 - Set custom passwords for each image share
-- Generate unique URLs for sharing
+- Generate unique short URLs (3 characters) for sharing
+- Access logs for each share (date, time, IP, user agent)
 - Manage uploaded images and shares
 - Minimal and clean shared image viewing page
 

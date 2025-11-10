@@ -114,6 +114,8 @@ def upload():
 @admin.route('/manage/<int:share_id>', methods=['GET', 'POST'])
 @login_required
 def manage(share_id):
+    from app.models import AccessLog
+    
     share = ImageShare.query.get_or_404(share_id)
     
     if share.user_id != current_user.id:
@@ -160,8 +162,7 @@ def manage(share_id):
                 
                 db.session.delete(image)
                 db.session.commit()
-                flash('Image deleted successfully')
+            flash('Image deleted successfully')
 
-        
     
-    return render_template('admin/manage.html', share=share)
+    return render_template('admin/manage.html', share=share, AccessLog=AccessLog)
