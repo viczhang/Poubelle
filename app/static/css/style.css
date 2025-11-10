@@ -1,0 +1,41 @@
+/* Basic styling for the image sharing app */
+body {
+    background-color: #f8f9fa;
+}
+
+.card {
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+.image-preview {
+    max-height: 200px;
+    object-fit: cover;
+}
+
+.share-url {
+    word-break: break-all;
+}
+
+.gallery-container {
+    margin-top: 30px;
+}
+
+.gallery-item {
+    margin-bottom: 20px;
+    transition: transform 0.3s ease;
+}
+
+.gallery-item:hover {
+    transform: scale(1.02);
+}
+
+.gallery-item img {
+    width: 100%;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}

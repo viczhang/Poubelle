@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  poubelle:
+    build: .
+    container_name: poubelle
+    restart: always
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./static/uploads:/app/static/uploads
+      - ./imageshare.db:/app/imageshare.db
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production

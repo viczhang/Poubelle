@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Images - Image Share{% endblock %}
+
+{% block content %}
+<h1>Upload Images</h1>
+<div class="card">
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="title" class="form-label">Share Title</label>
+                <input type="text" class="form-control" id="title" name="title" required>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password Protection</label>
+                <input type="password" class="form-control" id="password" name="password" required>
+                <div class="form-text">This password will be required to view the images.</div>
+            </div>
+            <div class="mb-3">
+                <label for="images" class="form-label">Select Images</label>
+                <input type="file" class="form-control" id="images" name="images" multiple accept="image/*" required>
+            </div>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">Create Share</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

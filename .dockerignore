@@ -1,0 +1,31 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local development
+.env
+.env.local
+.env.development.local
+
+# Uploaded files (these will be mounted as volumes)
+static/uploads/*

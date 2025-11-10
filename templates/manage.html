@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Share - Poubelle{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4>Share Details</h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <input type="hidden" name="action" value="update">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Title</label>
+                        <input type="text" class="form-control" id="title" name="title" value="{{ share.title }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">New Password</label>
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Leave blank to keep current">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Share URL</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" value="{{ url_for('view_share', share_id=share.share_id, _external=True) }}" readonly>
+                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard(this)">Copy</button>
+                        </div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Update Share</button>
+                    </div>
+                </form>
+                
+                <hr>
+                
+                <form method="post" onsubmit="return confirm('Are you sure you want to delete this share? This action cannot be undone.');">
+                    <input type="hidden" name="action" value="delete">
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-danger">Delete Share</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4>Images</h4>
+            </div>
+            <div class="card-body">
+                {% if images %}
+                <div class="row">
+                    {% for image in images %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <img src="{{ url_for('static', filename='uploads/' + image.filename) }}" class="card-img-top" alt="{{ image.original_filename }}">
+                            <div class="card-body">
+                                <p class="card-text small">{{ image.original_filename }}</p>
+                                <form method="post">
+                                    <input type="hidden" name="action" value="delete_image">
+                                    <input type="hidden" name="image_id" value="{{ image.id }}">
+                                    <div class="d-grid">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="alert alert-info">No images in this share.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyToClipboard(button) {
+    const input = button.previousElementSibling;
+    input.select();
+    document.execCommand('copy');
+    button.textContent = 'Copied!';
+    setTimeout(() => {
+        button.textContent = 'Copy';
+    }, 2000);
+}
+</script>
+{% endblock %}

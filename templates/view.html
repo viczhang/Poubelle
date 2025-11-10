@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}{{ share.title }} - Poubelle{% endblock %}
+
+{% block content %}
+<div class="text-center mb-4">
+    <h1>{{ share.title }}</h1>
+</div>
+
+{% if images %}
+<div class="row gallery">
+    {% for image in images %}
+    <div class="col-md-4 col-sm-6 mb-4">
+        <div class="gallery-item">
+            <a href="{{ url_for('static', filename='uploads/' + image.filename) }}" target="_blank">
+                <img src="{{ url_for('static', filename='uploads/' + image.filename) }}" class="img-fluid" alt="{{ image.original_filename }}">
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info text-center">
+    <p>No images in this collection.</p>
+</div>
+{% endif %}
+{% endblock %}

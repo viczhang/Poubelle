@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Share - Image Share{% endblock %}
+
+{% block content %}
+<h1>Manage Share: {{ share.title }}</h1>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Share Details</h5>
+        <p>Share URL: <a href="{{ url_for('share.view', share_id=share.share_id, _external=True) }}" target="_blank">{{ url_for('share.view', share_id=share.share_id, _external=True) }}</a></p>
+        
+        <form method="POST">
+            <input type="hidden" name="action" value="update">
+            <div class="mb-3">
+                <label for="title" class="form-label">Title</label>
+                <input type="text" class="form-control" id="title" name="title" value="{{ share.title }}">
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">New Password (leave blank to keep current)</label>
+                <input type="password" class="form-control" id="password" name="password">
+            </div>
+            <button type="submit" class="btn btn-primary">Update Share</button>
+        </form>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Images ({{ share.images.count() }})</h5>
+        <div class="row">
+            {% for image in share.images %}
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <img src="{{ url_for('static', filename='uploads/' + image.filename) }}" class="card-img-top" alt="{{ image.original_filename }}">
+                    <div class="card-body">
+                        <p class="card-text">{{ image.original_filename }}</p>
+                        <form method="POST" class="d-inline">
+                            <input type="hidden" name="action" value="delete_image">
+                            <input type="hidden" name="image_id" value="{{ image.id }}">
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this image?')">Delete</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="card bg-light">
+    <div class="card-body">
+        <h5 class="card-title text-danger">Danger Zone</h5>
+        <form method="POST" onsubmit="return confirm('Are you sure you want to delete this entire share? This action cannot be undone.')">
+            <input type="hidden" name="action" value="delete">
+            <button type="submit" class="btn btn-danger">Delete Entire Share</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Image Share{% endblock %}
+
+{% block content %}
+<h1>Admin Dashboard</h1>
+<div class="mb-4">
+    <a href="{{ url_for('admin.upload') }}" class="btn btn-primary">Upload New Images</a>
+</div>
+
+<div class="row">
+    {% if shares %}
+        {% for share in shares %}
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">{{ share.title }}</h5>
+                    <p class="card-text">
+                        Created: {{ share.created_at.strftime('%Y-%m-%d %H:%M') }}<br>
+                        Images: {{ share.images.count() }}
+                    </p>
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('admin.manage', share_id=share.id) }}" class="btn btn-sm btn-info">Manage</a>
+                        <a href="{{ url_for('share.view', share_id=share.share_id) }}" class="btn btn-sm btn-success" target="_blank">View</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12">
+            <div class="alert alert-info">
+                You haven't created any image shares yet. <a href="{{ url_for('admin.upload') }}">Upload some images</a> to get started.
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

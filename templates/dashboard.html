@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Poubelle{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Your Image Shares</h1>
+    <a href="{{ url_for('upload') }}" class="btn btn-primary">Create New Share</a>
+</div>
+
+{% if shares %}
+<div class="row">
+    {% for share in shares %}
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{ share.title }}</h5>
+                <p class="card-text">Created: {{ share.created_at }}</p>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('manage', share_id=share.id) }}" class="btn btn-outline-primary">Manage</a>
+                    <a href="{{ url_for('view_share', share_id=share.share_id) }}" class="btn btn-outline-secondary" target="_blank">View</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info">
+    <p>You haven't created any image shares yet. <a href="{{ url_for('upload') }}">Create one now</a>.</p>
+</div>
+{% endif %}
+{% endblock %}
