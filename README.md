@@ -45,9 +45,20 @@ Use Docker Compose to run the app on your server:
 1. Create an `.env` file next to `docker-compose.yml` (optional but recommended):
    ```bash
    echo "ADMIN_PASSWORD=SuperSecure!123" > .env
+   echo "SITE_TITLE=MyCustomSiteName" >> .env
    ```
 
 2. Review `docker-compose.yml`:
+   - The file already includes environment variables with default values:
+     - `ADMIN_PASSWORD`: Defaults to 'admin' if not set
+     - `SITE_TITLE`: Defaults to 'Poubelle' if not set
+
+3. You can customize these variables directly in the `.env` file or by setting environment variables when running Docker Compose:
+   ```bash
+   SITE_TITLE="MyCustomGallery" docker-compose up -d
+   ```
+
+4. When deployed, the site will use the custom title set in your environment variables.
    - The service exposes `5000` on the host
    - Persists data via volumes:
      - `./static/uploads:/app/static/uploads`

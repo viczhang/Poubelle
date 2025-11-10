@@ -12,6 +12,7 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///imageshare.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
+    app.config['SITE_TITLE'] = os.environ.get('SITE_TITLE', 'Poubelle')
     
     db.init_app(app)
     login_manager.init_app(app)

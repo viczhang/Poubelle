@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Image Share{% endblock %}</title>
+    <title>{% block title %}{{ config.SITE_TITLE }}{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('admin.dashboard') if current_user.is_authenticated else url_for('auth.login') }}">Image Share</a>
+            <a class="navbar-brand" href="{{ url_for('admin.dashboard') if current_user.is_authenticated else url_for('auth.login') }}">{{ config.SITE_TITLE }}</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
