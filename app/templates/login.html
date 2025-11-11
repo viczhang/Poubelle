@@ -1,37 +1,69 @@
 {% extends "base.html" %}
 
-{% block title %}Login - {{ config.SITE_TITLE }}{% endblock %}
+{% block title %}Welcome to {{ config.SITE_TITLE }}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
-        <!-- Upload button for anonymous users -->
-        {% if not current_user.is_authenticated %}
-        <div class="mb-4 text-center">
-            <a href="{{ url_for('admin.upload') }}" class="btn btn-success">Upload Images to Share</a>
-        </div>
-        {% endif %}
+    <div class="col-md-8 text-center mb-6">
+        <h1 class="h2 mb-5">Share Images Using Passwords</h1>
         
-        <div class="card">
-            <div class="card-header">
-                <h3 class="text-center">Admin Login</h3>
-            </div>
+        <!-- Prominent upload button for all users -->
+        <a href="{{ url_for('admin.upload') }}" class="btn btn-primary btn-lg px-6 py-3 shadow-lg">
+            <i class="bi bi-cloud-upload mr-2"></i> Upload Images to Share
+        </a>
+        
+        <!-- Explanatory text -->
+        <p class="mt-4 text-secondary text-sm">
+            You can share images without logging in.
+        </p>
+        
+        <!-- Admin login toggle link -->
+        <p class="mt-3">
+            <a href="#" id="toggle-admin-login" class="text-sm text-primary">
+                <i class="bi bi-shield-lock mr-1"></i> Show Admin Login
+            </a>
+        </p>
+    </div>
+</div>
+
+<!-- Hidden admin login section -->
+<div id="admin-login-section" style="display: none;" class="row justify-content-center mt-6">
+    <div class="col-md-4">
+        <div class="card border-light shadow-sm">
+            <!-- Admin login form without header -->
             <div class="card-body">
                 <form method="POST">
                     <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
+                        <label for="username" class="form-label text-sm text-muted">Username</label>
                         <input type="text" class="form-control" id="username" name="username" required>
                     </div>
                     <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
+                        <label for="password" class="form-label text-sm text-muted">Password</label>
                         <input type="password" class="form-control" id="password" name="password" required>
                     </div>
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Login</button>
+                        <button type="submit" class="btn btn-secondary btn-sm">Login as Admin</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<!-- JavaScript to toggle admin login section -->
+<script>
+    document.getElementById('toggle-admin-login').addEventListener('click', function(e) {
+        e.preventDefault();
+        const loginSection = document.getElementById('admin-login-section');
+        const toggleLink = this;
+        
+        if (loginSection.style.display === 'none') {
+            loginSection.style.display = 'flex';
+            toggleLink.innerHTML = '<i class="bi bi-shield-lock mr-1"></i> Hide Admin Login';
+        } else {
+            loginSection.style.display = 'none';
+            toggleLink.innerHTML = '<i class="bi bi-shield-lock mr-1"></i> Show Admin Login';
+        }
+    });
+</script>
 {% endblock %}

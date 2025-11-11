@@ -325,9 +325,35 @@ def upload():
             (session['user_id'],)
         ).fetchone()[0]
         
+        # If reached limit, delete the oldest share to make room
         if current_shares_count >= app.config['MAX_SHARES']:
-            flash(f'You have reached the maximum limit of {app.config["MAX_SHARES"]} shares')
-            return redirect(url_for('upload'))
+            # Get the oldest share
+            oldest_share = db.execute(
+                'SELECT id FROM image_shares WHERE user_id = ? ORDER BY created_at ASC LIMIT 1',
+                (session['user_id'],)
+            ).fetchone()
+            
+            if oldest_share:
+                oldest_share_id = oldest_share['id']
+                
+                # Delete associated images from filesystem and database
+                images = db.execute('SELECT filename FROM images WHERE share_id = ?', (oldest_share_id,)).fetchall()
+                for image in images:
+                    try:
+                        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], image['filename']))
+                    except Exception as e:
+                        print(f"Error deleting file {image['filename']}: {e}")
+                
+                # Delete images from database
+                db.execute('DELETE FROM images WHERE share_id = ?', (oldest_share_id,))
+                
+                # Delete access logs
+                db.execute('DELETE FROM access_logs WHERE share_id = ?', (oldest_share_id,))
+                
+                # Delete the share
+                db.execute('DELETE FROM image_shares WHERE id = ?', (oldest_share_id,))
+                db.commit()
+                flash('Your oldest share has been automatically deleted to make room for new uploads')
         
         # Create share
         share_id = generate_short_id(3)  # 3-character short ID
