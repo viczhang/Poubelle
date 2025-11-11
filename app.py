@@ -16,6 +16,8 @@ app.config['SECRET_KEY'] = 'dev-key-for-testing'
 app.config['DATABASE'] = os.path.join(os.path.dirname(__file__), 'imageshare.db')
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
+# Set maximum shares limit via environment; defaults to 100 if not provided
+app.config['MAX_SHARES'] = int(os.environ.get('MAX_SHARES', 100))
 
 # Configure ProxyFix to get real client IP addresses behind Caddy
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
@@ -315,6 +317,17 @@ def upload():
                 if file_size > 5 * 1024 * 1024:  # 5MB in bytes
                     flash(f'Image {file.filename} exceeds 5MB limit')
                     return redirect(url_for('upload'))
+        
+        # Check if user has reached maximum shares limit
+        db = get_db()
+        current_shares_count = db.execute(
+            'SELECT COUNT(*) FROM image_shares WHERE user_id = ?', 
+            (session['user_id'],)
+        ).fetchone()[0]
+        
+        if current_shares_count >= app.config['MAX_SHARES']:
+            flash(f'You have reached the maximum limit of {app.config["MAX_SHARES"]} shares')
+            return redirect(url_for('upload'))
         
         # Create share
         share_id = generate_short_id(3)  # 3-character short ID
