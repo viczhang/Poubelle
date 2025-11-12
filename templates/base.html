@@ -7,14 +7,22 @@
     <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        /* Ensure mobile menu items are right-aligned */
+        /* Ensure menu items are right-aligned on all screen sizes */
+        .navbar-collapse {
+            justify-content: flex-end !important;
+        }
+        .navbar-nav {
+            text-align: right !important;
+            justify-content: flex-end !important;
+        }
+        
+        /* Additional styles for mobile view */
         @media (max-width: 992px) {
             .navbar-collapse.collapse.show {
                 justify-content: flex-end !important;
                 text-align: right !important;
             }
             .navbar-nav {
-                text-align: right !important;
                 width: 100% !important;
             }
             .navbar-nav .nav-item {
