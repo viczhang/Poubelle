@@ -1,4 +1,4 @@
-# Image Sharing Web App
+# Poubelle
 
 A simple web application for securely sharing images with password protection.
 
