@@ -7,21 +7,64 @@
     <h1 class="h2 mb-5">{{ share.title }}</h1>
 </div>
 
+<!-- Text Content Section -->
+{% if text_content %}
+<div class="row mb-4">
+    <div class="col-12">
+        {% for text in text_content %}
+        <div class="card mb-2">
+            <div class="card-body">
+                <p class="mb-0" style="white-space: pre-wrap;">{{ text.content }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Images Section -->
 {% if images %}
-<div class="row gallery">
-    {% for image in images %}
-    <div class="col-md-4 col-sm-6 mb-4">
-        <div class="gallery-item">
-            <a href="{{ url_for('static', filename='uploads/' + image.filename) }}" target="_blank">
-                <img src="{{ url_for('static', filename='uploads/' + image.filename) }}" class="img-fluid" alt="{{ image.original_filename }}">
-            </a>
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="row gallery">
+            {% for image in images %}
+            <div class="col-md-4 col-sm-6 mb-4">
+                <div class="gallery-item">
+                    <a href="{{ url_for('static', filename='uploads/' + image.filename) }}" target="_blank">
+                        <img src="{{ url_for('static', filename='uploads/' + image.filename) }}" class="img-fluid" alt="{{ image.original_filename }}">
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
         </div>
     </div>
-    {% endfor %}
 </div>
-{% else %}
+{% endif %}
+
+<!-- Videos Section -->
+{% if videos %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="row">
+            {% for video in videos %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card">
+                    <video controls class="card-img-top" preload="metadata" style="max-width: 100%; height: auto;" crossorigin="anonymous">
+                        <source src="{{ url_for('serve_video', filename=video.filename) }}" type="video/mp4">
+                        <p>Your browser does not support the video tag.</p>
+                    </video>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Empty State -->
+{% if not images and not videos and not text_content %}
 <div class="alert alert-info text-center">
-    <p>No images in this collection.</p>
+    <p>No content in this collection.</p>
 </div>
 {% endif %}
 {% endblock %}

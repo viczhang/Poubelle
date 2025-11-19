@@ -8,8 +8,21 @@ from app import db
 
 admin = Blueprint('admin', __name__)
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
+def allowed_file(filename, file_type='image'):
+    """Check if file extension is allowed based on file type."""
+    if '.' not in filename:
+        return False
+    
+    ext = filename.rsplit('.', 1)[1].lower()
+    
+    if file_type == 'image':
+        return ext in {'png', 'jpg', 'jpeg', 'gif'}
+    elif file_type == 'video':
+        return ext in {'mp4', 'webm', 'avi', 'mov'}
+    elif file_type == 'text':
+        return ext in {'txt', 'md', 'json', 'xml', 'csv'}
+    
+    return False
 
 @admin.route('/dashboard', methods=['GET', 'POST'])
 @login_required
@@ -33,7 +46,7 @@ def dashboard():
     new_url = request.args.get('new_url')
     # For admin users, show all shares ordered by creation date (newest first)
     shares = ImageShare.query.order_by(ImageShare.created_at.desc()).all()
-    return render_template('admin/dashboard.html', shares=shares, new_url=new_url)
+    return render_template('admin/dashboard.html', shares=shares, new_url=new_url, is_admin=True)
 
 @admin.route('/delete_all_shares', methods=['POST'])
 @login_required
@@ -80,42 +93,65 @@ def upload():
     if request.method == 'POST':
         title = request.form.get('title')
         password = request.form.get('password')
+        text_content = request.form.get('text_content', '').strip()
         
         if not title:
             flash('Title is required')
             return redirect(url_for('admin.upload'))
         
-        files = request.files.getlist('images')
-        if not files or files[0].filename == '':
-            flash('No images selected')
+        # Get files from different input types
+        image_files = request.files.getlist('image_files[]')
+        video_files = request.files.getlist('video_files[]')
+        
+        # Filter out empty files
+        image_files = [f for f in image_files if f and f.filename]
+        video_files = [f for f in video_files if f and f.filename]
+        
+        # Validate content requirements
+        if not image_files and not video_files and not text_content:
+            flash('Please provide at least one type of content (images, videos, or text)')
             return redirect(url_for('admin.upload'))
         
-        # Limit to 10 images per share
-        if len(files) > 10:
+        # Validate file limits
+        if len(image_files) > 10:
             flash('Maximum 10 images allowed per share')
             return redirect(url_for('admin.upload'))
         
-        # Check each file size (5MB limit)
-        for file in files:
-            if file and allowed_file(file.filename):
-                # Get file size
+        if len(video_files) > 10:
+            flash('Maximum 10 videos allowed per share')
+            return redirect(url_for('admin.upload'))
+        
+        # Validate file sizes and types
+        for file in image_files:
+            if file and allowed_file(file.filename, 'image'):
                 file.seek(0, os.SEEK_END)
                 file_size = file.tell()
-                file.seek(0)  # Reset file position
-                
-                if file_size > 5 * 1024 * 1024:  # 5MB in bytes
+                file.seek(0)
+                if file_size > 5 * 1024 * 1024:  # 5MB limit
                     flash(f'Image {file.filename} exceeds 5MB limit')
                     return redirect(url_for('admin.upload'))
         
-        # For non-logged in users, user_id will be None
+        for file in video_files:
+            if file and allowed_file(file.filename, 'video'):
+                file.seek(0, os.SEEK_END)
+                file_size = file.tell()
+                file.seek(0)
+                if file_size > 10 * 1024 * 1024:  # 10MB limit
+                    flash(f'Video {file.filename} exceeds 10MB limit')
+                    return redirect(url_for('admin.upload'))
+        
+        # Create share with text content if provided
         user_id = current_user.id if current_user.is_authenticated else None
         share = ImageShare(title=title, user_id=user_id)
+        if text_content:
+            share.text_content = text_content
         share.set_password(password)
         db.session.add(share)
-        db.session.flush()  # Get the ID without committing
+        db.session.flush()
         
-        for file in files:
-            if file and allowed_file(file.filename):
+        # Process image files
+        for file in image_files:
+            if file and allowed_file(file.filename, 'image'):
                 filename = secure_filename(file.filename)
                 unique_filename = f"{uuid.uuid4()}_{filename}"
                 file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
@@ -124,9 +160,26 @@ def upload():
                 image = Image(
                     filename=unique_filename,
                     original_filename=filename,
-                    share_id=share.id
+                    share_id=share.id,
+                    file_type='image'
                 )
                 db.session.add(image)
+        
+        # Process video files
+        for file in video_files:
+            if file and allowed_file(file.filename, 'video'):
+                filename = secure_filename(file.filename)
+                unique_filename = f"{uuid.uuid4()}_{filename}"
+                file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
+                file.save(file_path)
+                
+                video = Image(
+                    filename=unique_filename,
+                    original_filename=filename,
+                    share_id=share.id,
+                    file_type='video'
+                )
+                db.session.add(video)
         
         db.session.commit()
         share_url = url_for('share.view', share_id=share.share_id, _external=True, _scheme='https')

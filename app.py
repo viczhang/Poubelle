@@ -15,9 +15,10 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-key-for-testing'
 app.config['DATABASE'] = os.path.join(os.path.dirname(__file__), 'imageshare.db')
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
-app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'webm', 'avi', 'mov'}
 # Set maximum shares limit via environment; defaults to 100 if not provided
 app.config['MAX_SHARES'] = int(os.environ.get('MAX_SHARES', 100))
+app.config['SITE_TITLE'] = os.environ.get('SITE_TITLE', 'Poubelle')
 
 # Configure ProxyFix to get real client IP addresses behind Caddy
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
@@ -43,28 +44,23 @@ def close_db(e=None):
 def init_db():
     db = get_db()
     db.executescript('''
-    DROP TABLE IF EXISTS users;
-    DROP TABLE IF EXISTS image_shares;
-    DROP TABLE IF EXISTS images;
-    DROP TABLE IF EXISTS access_logs;
-    
-    CREATE TABLE users (
+    CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL
     );
     
-    CREATE TABLE image_shares (
+    CREATE TABLE IF NOT EXISTS image_shares (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         share_id TEXT UNIQUE NOT NULL,
         title TEXT NOT NULL,
         password_hash TEXT NOT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        user_id INTEGER NOT NULL,
+        user_id INTEGER,
         FOREIGN KEY (user_id) REFERENCES users (id)
     );
     
-    CREATE TABLE images (
+    CREATE TABLE IF NOT EXISTS images (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         filename TEXT NOT NULL,
         original_filename TEXT NOT NULL,
@@ -73,7 +69,24 @@ def init_db():
         FOREIGN KEY (share_id) REFERENCES image_shares (id)
     );
     
-    CREATE TABLE access_logs (
+    CREATE TABLE IF NOT EXISTS videos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        filename TEXT NOT NULL,
+        original_filename TEXT NOT NULL,
+        uploaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        share_id INTEGER NOT NULL,
+        FOREIGN KEY (share_id) REFERENCES image_shares (id)
+    );
+    
+    CREATE TABLE IF NOT EXISTS text_content (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        share_id INTEGER NOT NULL,
+        FOREIGN KEY (share_id) REFERENCES image_shares (id)
+    );
+    
+    CREATE TABLE IF NOT EXISTS access_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         share_id INTEGER NOT NULL,
         access_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -83,14 +96,16 @@ def init_db():
     );
     ''')
     
-    # Create admin user
+    # Create admin user if not exists
     cursor = db.cursor()
-    admin_password = os.environ.get('ADMIN_PASSWORD', 'admin')
-    cursor.execute(
-        "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-        ('admin', generate_password_hash(admin_password))
-    )
-    db.commit()
+    admin_exists = cursor.execute('SELECT id FROM users WHERE username = ?', ('admin',)).fetchone()
+    if not admin_exists:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'admin')
+        cursor.execute(
+            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+            ('admin', generate_password_hash(admin_password))
+        )
+        db.commit()
 
 # Helper functions
 def allowed_file(filename):
@@ -110,10 +125,96 @@ def login_required(f):
     return decorated_function
 
 # Routes
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/video/<filename>')
+def serve_video(filename):
+    """Custom video serving route with proper range support"""
+    video_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    
+    if not os.path.exists(video_path):
+        return "Video not found", 404
+    
+    # Security check - ensure filename is safe
+    if not allowed_file(filename):
+        return "Invalid video file", 400
+    
+    file_size = os.path.getsize(video_path)
+    
+    # Handle range requests for video streaming
+    range_header = request.headers.get('Range', None)
+    
+    if range_header:
+        # Parse range header
+        try:
+            range_match = range_header.replace('bytes=', '').split('-')
+            start = int(range_match[0]) if range_match[0] else 0
+            end = int(range_match[1]) if range_match[1] and range_match[1] != '' else file_size - 1
+            
+            # Ensure valid range
+            start = max(0, start)
+            end = min(file_size - 1, end)
+            
+            if start > end:
+                return "Invalid range", 416
+                
+            content_length = end - start + 1
+            
+            def generate():
+                with open(video_path, 'rb') as f:
+                    f.seek(start)
+                    bytes_to_read = content_length
+                    while bytes_to_read > 0:
+                        chunk_size = min(8192, bytes_to_read)
+                        data = f.read(chunk_size)
+                        if not data:
+                            break
+                        bytes_to_read -= len(data)
+                        yield data
+            
+            response = app.response_class(generate(), mimetype='video/mp4')
+            response.headers.add('Content-Range', f'bytes {start}-{end}/{file_size}')
+            response.headers.add('Accept-Ranges', 'bytes')
+            response.headers.add('Content-Length', str(content_length))
+            response.headers.add('Cache-Control', 'public, max-age=3600')
+            response.headers.add('Content-Disposition', f'inline; filename="{filename}"')
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            response.headers.add('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
+            response.headers.add('Access-Control-Allow-Headers', 'Range')
+            response.headers.add('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Range')
+            response.status_code = 206  # Partial Content
+            return response
+            
+        except (ValueError, IndexError):
+            # If range parsing fails, fall back to full file
+            pass
+    
+    # Serve full file if no range request
+    def generate():
+        with open(video_path, 'rb') as f:
+            while True:
+                data = f.read(8192)
+                if not data:
+                    break
+                yield data
+    
+    response = app.response_class(generate(), mimetype='video/mp4')
+    response.headers.add('Content-Length', str(file_size))
+    response.headers.add('Accept-Ranges', 'bytes')
+    response.headers.add('Cache-Control', 'public, max-age=3600')
+    response.headers.add('Content-Disposition', f'inline; filename="{filename}"')
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
+    response.headers.add('Access-Control-Allow-Headers', 'Range')
+    response.headers.add('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Range')
+    return response
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'user_id' in session:
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('admin.dashboard'))
     
     if request.method == 'POST':
         username = request.form.get('username')
@@ -125,7 +226,7 @@ def login():
         if user and check_password_hash(user['password_hash'], password):
             session['user_id'] = user['id']
             next_page = request.args.get('next')
-            return redirect(next_page or url_for('dashboard'))
+            return redirect(next_page or url_for('admin.dashboard'))
         
         flash('Invalid username or password')
     
@@ -136,7 +237,6 @@ def logout():
     session.pop('user_id', None)
     return redirect(url_for('login'))
 
-@app.route('/')
 # 简单的测试路由，用于直接删除所有共享
 @app.route('/test_delete_all', methods=['POST'])
 @login_required
@@ -145,7 +245,7 @@ def test_delete_all():
     confirm_text = request.form.get('confirm_text', '')
     if confirm_text.upper() != 'DELETE':
         flash('Invalid confirmation text. Please type "DELETE" exactly.')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('admin.dashboard'))
     
     db = get_db()
     # Get all shares for the current user
@@ -196,97 +296,9 @@ def test_delete_all():
     
     return redirect(url_for('dashboard'))
 
-@app.route('/dashboard', methods=['GET', 'POST'])
-@login_required
-def dashboard():
-    db = get_db()
-    new_url = request.args.get('new_url')
-    if request.method == 'POST':
-        action = request.form.get('action')
-        
-        if action == 'change_admin_password':
-            new_password = request.form.get('new_admin_password')
-            confirm_password = request.form.get('confirm_admin_password')
 
-            if not new_password:
-                flash('Please enter a new admin password')
-            elif new_password != confirm_password:
-                flash('Admin passwords do not match')
-            else:
-                db.execute(
-                    'UPDATE users SET password_hash = ? WHERE id = ?',
-                    (generate_password_hash(new_password), session['user_id'])
-                )
-                db.commit()
-                flash('Admin password updated successfully')
-        
-        elif action == 'delete_all_shares':
-            # Get all shares for the current user
-            shares = db.execute('SELECT id FROM image_shares WHERE user_id = ?', 
-                              (session['user_id'],)).fetchall()
-            
-            if shares:
-                # Get all images for these shares
-                share_ids = [share['id'] for share in shares]
-                if share_ids:
-                    # Get all image filenames to delete
-                    images = db.execute(
-                        'SELECT filename FROM images WHERE share_id IN ({})'.format(
-                            ','.join(['?'] * len(share_ids))
-                        ),
-                        share_ids
-                    ).fetchall()
-                    
-                    # Delete image files from filesystem
-                    for image in images:
-                        try:
-                            os.remove(os.path.join(app.config['UPLOAD_FOLDER'], image['filename']))
-                        except Exception as e:
-                            # Log error but continue with other deletions
-                            print(f"Error deleting file {image['filename']}: {e}")
-                    
-                    # Delete all images associated with these shares
-                    db.execute(
-                        'DELETE FROM images WHERE share_id IN ({})'.format(
-                            ','.join(['?'] * len(share_ids))
-                        ),
-                        share_ids
-                    )
-                    
-                    # Delete all shares
-                    db.execute(
-                        'DELETE FROM image_shares WHERE id IN ({})'.format(
-                            ','.join(['?'] * len(share_ids))
-                        ),
-                        share_ids
-                    )
-                    
-                    db.commit()
-                    flash('All shares and associated files have been deleted')
-                else:
-                    flash('No shares found to delete')
-            else:
-                flash('No shares found to delete')
-
-        return redirect(url_for('dashboard'))
-
-    shares = db.execute('SELECT * FROM image_shares WHERE user_id = ? ORDER BY created_at DESC', 
-                      (session['user_id'],)).fetchall()
-    
-    # Add images count and views count to each share
-    for share in shares:
-        # Count images for this share
-        images_count = db.execute('SELECT COUNT(*) FROM images WHERE share_id = ?', (share['id'],)).fetchone()[0]
-        # Count views (access logs) for this share
-        views_count = db.execute('SELECT COUNT(*) FROM access_logs WHERE share_id = ?', (share['id'],)).fetchone()[0]
-        
-        # Add attributes to the share object
-        share['images'] = []  # Just for template compatibility
-        share['views_count'] = views_count
-    return render_template('dashboard.html', shares=shares, new_url=new_url)
 
 @app.route('/upload', methods=['GET', 'POST'])
-@login_required
 def upload():
     if request.method == 'POST':
         title = request.form.get('title')
@@ -296,64 +308,62 @@ def upload():
             flash('Title is required')
             return redirect(url_for('upload'))
         
-        files = request.files.getlist('images')
-        if not files or files[0].filename == '':
-            flash('No images selected')
+        # Get all content types
+        image_files = []
+        video_files = []
+        
+        # Collect all image files from array inputs
+        for key in request.files:
+            if key.startswith('image_files['):
+                image_files.extend(request.files.getlist(key))
+        
+        # Collect all video files from array inputs
+        for key in request.files:
+            if key.startswith('video_files['):
+                video_files.extend(request.files.getlist(key))
+        
+        text_content = request.form.get('text_content', '').strip()
+        
+        # Check if any content was provided
+        has_images = any(image_files) and image_files[0].filename != ''
+        has_videos = any(video_files) and video_files[0].filename != ''
+        has_text = bool(text_content)
+        
+        if not has_images and not has_videos and not has_text:
+            flash('Please provide at least one type of content (images, videos, or text)')
             return redirect(url_for('upload'))
         
-        # Limit to 10 images per share
-        if len(files) > 10:
-            flash('Maximum 10 images allowed per share')
-            return redirect(url_for('upload'))
-        
-        # Check each file size (5MB limit)
-        for file in files:
-            if file and allowed_file(file.filename):
-                # Get file size
-                file.seek(0, os.SEEK_END)
-                file_size = file.tell()
-                file.seek(0)  # Reset file position
-                
-                if file_size > 5 * 1024 * 1024:  # 5MB in bytes
-                    flash(f'Image {file.filename} exceeds 5MB limit')
-                    return redirect(url_for('upload'))
-        
-        # Check if user has reached maximum shares limit
-        db = get_db()
-        current_shares_count = db.execute(
-            'SELECT COUNT(*) FROM image_shares WHERE user_id = ?', 
-            (session['user_id'],)
-        ).fetchone()[0]
-        
-        # If reached limit, delete the oldest share to make room
-        if current_shares_count >= app.config['MAX_SHARES']:
-            # Get the oldest share
-            oldest_share = db.execute(
-                'SELECT id FROM image_shares WHERE user_id = ? ORDER BY created_at ASC LIMIT 1',
-                (session['user_id'],)
-            ).fetchone()
+        # Validate image files
+        if has_images:
+            if len(image_files) > 10:
+                flash('Maximum 10 images allowed per share')
+                return redirect(url_for('upload'))
             
-            if oldest_share:
-                oldest_share_id = oldest_share['id']
-                
-                # Delete associated images from filesystem and database
-                images = db.execute('SELECT filename FROM images WHERE share_id = ?', (oldest_share_id,)).fetchall()
-                for image in images:
-                    try:
-                        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], image['filename']))
-                    except Exception as e:
-                        print(f"Error deleting file {image['filename']}: {e}")
-                
-                # Delete images from database
-                db.execute('DELETE FROM images WHERE share_id = ?', (oldest_share_id,))
-                
-                # Delete access logs
-                db.execute('DELETE FROM access_logs WHERE share_id = ?', (oldest_share_id,))
-                
-                # Delete the share
-                db.execute('DELETE FROM image_shares WHERE id = ?', (oldest_share_id,))
-                db.commit()
-                flash('Your oldest share has been automatically deleted to make room for new uploads')
+            for file in image_files:
+                if file and allowed_file(file.filename):
+                    file.seek(0, os.SEEK_END)
+                    file_size = file.tell()
+                    file.seek(0)
+                    
+                    if file_size > 5 * 1024 * 1024:  # 5MB limit
+                        flash(f'Image {file.filename} exceeds 5MB limit')
+                        return redirect(url_for('upload'))
+        
+        # Validate video files
+        if has_videos:
+            if len(video_files) > 10:
+                flash('Maximum 10 videos allowed per share')
+                return redirect(url_for('upload'))
+            
+            for file in video_files:
+                if file and allowed_file(file.filename):
+                    file.seek(0, os.SEEK_END)
+                    file_size = file.tell()
+                    file.seek(0)
+                    
+                    if file_size > 10 * 1024 * 1024:  # 10MB limit
+                        flash(f'Video {file.filename} exceeds 10MB limit')
+                        return redirect(url_for('upload'))
         
         # Create share
         share_id = generate_short_id(3)  # 3-character short ID
@@ -366,26 +376,48 @@ def upload():
             
         cursor.execute(
             'INSERT INTO image_shares (share_id, title, password_hash, user_id) VALUES (?, ?, ?, ?)',
-            (share_id, title, generate_password_hash(password) if password else '', session['user_id'])
+            (share_id, title, generate_password_hash(password) if password else '', None)
         )
         share_db_id = cursor.lastrowid
         
         # Save images
-        for file in files:
-            if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                unique_filename = f"{uuid.uuid4()}_{filename}"
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-                file.save(file_path)
-                
-                cursor.execute(
-                    'INSERT INTO images (filename, original_filename, share_id) VALUES (?, ?, ?)',
-                    (unique_filename, filename, share_db_id)
-                )
+        if has_images:
+            for file in image_files:
+                if file and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    unique_filename = f"{uuid.uuid4()}_{filename}"
+                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                    file.save(file_path)
+                    
+                    cursor.execute(
+                        'INSERT INTO images (filename, original_filename, share_id) VALUES (?, ?, ?)',
+                        (unique_filename, filename, share_db_id)
+                    )
+        
+        # Save videos
+        if has_videos:
+            for file in video_files:
+                if file and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    unique_filename = f"{uuid.uuid4()}_{filename}"
+                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                    file.save(file_path)
+                    
+                    cursor.execute(
+                        'INSERT INTO image (filename, original_filename, file_type, share_id) VALUES (?, ?, ?, ?)',
+                        (unique_filename, filename, 'video', share_db_id)
+                    )
+        
+        # Save text content
+        if has_text:
+            cursor.execute(
+                'INSERT INTO text_content (content, share_id) VALUES (?, ?)',
+                (text_content, share_db_id)
+            )
         
         db.commit()
-        share_url = url_for("view_share", share_id=share_id, _external=True, _scheme='https')
-        return redirect(url_for('dashboard', new_url=share_url))
+        share_url = url_for("view_share", share_id=share_id, _external=True)
+        return render_template('upload_success.html', share_url=share_url)
     
     return render_template('upload.html')
 
@@ -397,7 +429,7 @@ def manage(share_id):
     
     if not share or share['user_id'] != session['user_id']:
         flash('You do not have permission to manage this share')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('admin.dashboard'))
     
     if request.method == 'POST':
         action = request.form.get('action')
@@ -430,7 +462,7 @@ def manage(share_id):
             db.commit()
             
             flash('Share deleted successfully')
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('admin.dashboard'))
         
         elif action == 'delete_image':
             image_id = request.form.get('image_id')
@@ -489,8 +521,10 @@ def view_share(share_id):
             db.commit()
             print(f"Access logged for share_id {share['id']} at {db_timestamp}")
         
-        images = db.execute('SELECT * FROM images WHERE share_id = ?', (share['id'],)).fetchall()
-        return render_template('view.html', share=share, images=images)
+        images = db.execute('SELECT * FROM image WHERE share_id = ? AND file_type = ?', (share['id'], 'image')).fetchall()
+        videos = db.execute('SELECT * FROM image WHERE share_id = ? AND file_type = ?', (share['id'], 'video')).fetchall()
+        text_content = db.execute('SELECT * FROM text_content WHERE share_id = ?', (share['id'],)).fetchall()
+        return render_template('view.html', share=share, images=images, videos=videos, text_content=text_content)
     
     if request.method == 'POST':
         password = request.form.get('password')
@@ -513,7 +547,9 @@ def view_share(share_id):
             session[f'viewed_{share_id}'] = current_time.isoformat()
             
             images = db.execute('SELECT * FROM images WHERE share_id = ?', (share['id'],)).fetchall()
-            return render_template('view.html', share=share, images=images)
+            videos = db.execute('SELECT * FROM videos WHERE share_id = ?', (share['id'],)).fetchall()
+            text_content = db.execute('SELECT * FROM text_content WHERE share_id = ?', (share['id'],)).fetchall()
+            return render_template('view.html', share=share, images=images, videos=videos, text_content=text_content)
         else:
             flash('Invalid password')
     

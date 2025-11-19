@@ -6,9 +6,9 @@
 <div class="row justify-content-center">
     <div class="col-md-6">
         <!-- Upload button for anonymous users -->
-        {% if not current_user.is_authenticated %}
+        {% if not session.user_id %}
         <div class="mb-4 text-center">
-            <a href="{{ url_for('admin.upload') }}" class="btn btn-success">Upload Images to Share</a>
+            <a href="{{ url_for('upload') }}" class="btn btn-success">Upload Images to Share</a>
         </div>
         {% endif %}
         

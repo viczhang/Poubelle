@@ -47,6 +47,7 @@ class ImageShare(db.Model):
         # Fallback to UUID if we can't find a unique short ID
         return str(uuid.uuid4())
     title = db.Column(db.String(100))
+    text_content = db.Column(db.Text, nullable=True)
     password_hash = db.Column(db.String(128))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
@@ -68,6 +69,7 @@ class Image(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(100))
     original_filename = db.Column(db.String(100))
+    file_type = db.Column(db.String(20), default='image')  # image, video, text
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
     share_id = db.Column(db.Integer, db.ForeignKey('image_share.id'))
 

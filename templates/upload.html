@@ -1,13 +1,49 @@
 {% extends "base.html" %}
 
-{% block title %}Upload Images - {{ config.SITE_TITLE }}{% endblock %}
+{% block title %}Upload Content - {{ config.SITE_TITLE }}{% endblock %}
 
 {% block content %}
+<style>
+    .file-input-group {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6 !important;
+        transition: all 0.3s ease;
+    }
+    
+    .file-input-group:hover {
+        background-color: #e9ecef;
+        border-color: #adb5bd !important;
+    }
+    
+    .preview-item {
+        border-left: 3px solid #007bff;
+    }
+    
+    .preview-item .bi {
+        font-size: 1.2rem;
+        color: #007bff;
+    }
+    
+    #addFileBtn {
+        transition: all 0.3s ease;
+    }
+    
+    #addFileBtn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .modal .btn-outline-primary:hover {
+        background-color: #007bff;
+        color: white;
+    }
+</style>
+
 <div class="row justify-content-center">
     <div class="col-md-8">
         <div class="card">
             <div class="card-header">
-                <h3>Upload Images</h3>
+                <h3>Upload Content</h3>
             </div>
             <div class="card-body">
                 <form method="post" enctype="multipart/form-data">
@@ -20,19 +56,35 @@
                         <input type="password" class="form-control" id="password" name="password">
                         <div class="form-text">Leave blank to make the share accessible without a password.</div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Images</label>
-                        <input type="file" class="form-control d-none" id="file-input" name="images" multiple accept="image/*">
-                        <div class="d-grid gap-2 mb-3">
-                            <button type="button" id="add-files-btn" class="btn btn-outline-primary">
-                                <i class="bi bi-plus-circle"></i> Add Images
+                    
+                    <!-- Dynamic File Upload Section -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5>Files & Content</h5>
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="addFileBtn">
+                                <i class="bi bi-plus"></i> Add File
                             </button>
                         </div>
-                        <div class="form-text mb-2">Maximum 10 images per share, 5MB per image</div>
-                        <div id="file-list" class="mt-2"></div>
+                        
+                        <!-- Container for dynamic file inputs -->
+                        <div id="fileInputsContainer">
+                            <!-- Initial file inputs will be added here -->
+                            <div class="text-center text-muted mb-3">
+                                <p class="mb-2">No files added yet</p>
+                                <small>Click "Add File" to start uploading content</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Text Content Section -->
+                        <div class="mb-3">
+                            <h6>Text Content</h6>
+                            <textarea class="form-control" name="text_content" rows="4" placeholder="Enter any text content you want to share..."></textarea>
+                            <div class="form-text">Optional text content to accompany your media</div>
+                        </div>
                     </div>
+                    
                     <div class="d-grid">
-                        <button type="submit" id="submit-btn" class="btn btn-primary" disabled>Upload and Share</button>
+                        <button type="submit" class="btn btn-primary">Create Share</button>
                     </div>
                 </form>
             </div>
@@ -41,149 +93,259 @@
 </div>
 
 <script>
+    // Dynamic file upload functionality
     document.addEventListener('DOMContentLoaded', function() {
-        const fileInput = document.getElementById('file-input');
-        const addFilesBtn = document.getElementById('add-files-btn');
-        const fileList = document.getElementById('file-list');
-        const submitBtn = document.getElementById('submit-btn');
-        let selectedFiles = [];
+        const addFileBtn = document.getElementById('addFileBtn');
+        const fileInputsContainer = document.getElementById('fileInputsContainer');
+        const form = document.querySelector('form');
+        let fileInputCount = 0;
         
-        // Maximum files allowed
-        const MAX_FILES = 10;
-        const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+        // File type configurations
+        const fileTypes = {
+            image: {
+                accept: 'image/*',
+                maxSize: 5, // MB
+                allowedTypes: ['image/png', 'image/jpg', 'image/jpeg', 'image/gif'],
+                allowedExtensions: ['png', 'jpg', 'jpeg', 'gif'],
+                maxFiles: 10,
+                name: 'image_files'
+            },
+            video: {
+                accept: 'video/*',
+                maxSize: 10, // MB
+                allowedTypes: ['video/mp4', 'video/webm', 'video/avi', 'video/mov'],
+                allowedExtensions: ['mp4', 'webm', 'avi', 'mov'],
+                maxFiles: 10,
+                name: 'video_files'
+            }
+        };
         
-        // Update submit button state
-        function updateSubmitButton() {
-            submitBtn.disabled = selectedFiles.length === 0;
+        // Create file type selection modal
+        function createFileTypeModal() {
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.id = 'fileTypeModal';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-sm">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Choose File Type</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-primary" onclick="addFileInput('image')">
+                                    <i class="bi bi-image"></i> Image
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" onclick="addFileInput('video')">
+                                    <i class="bi bi-camera-video"></i> Video
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            return new bootstrap.Modal(modal);
         }
         
-        // Display file information
-        function displayFile(file) {
-            const fileSize = (file.size / 1024).toFixed(2);
-            const fileItem = document.createElement('div');
-            fileItem.className = 'd-flex align-items-center p-2 border rounded mb-2';
-            fileItem.dataset.index = selectedFiles.length - 1;
+        // Add file input function
+        window.addFileInput = function(type) {
+            const config = fileTypes[type];
+            const inputId = `file_${type}_${fileInputCount++}`;
             
-            // Create file preview if it's an image
-            let previewHtml = '<div class="flex-shrink-0 mr-3">';
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.className = 'img-thumbnail';
-                    img.style.width = '80px';
-                    img.style.height = '80px';
-                    img.style.objectFit = 'cover';
-                    previewHtml = img.outerHTML;
-                    fileItem.querySelector('.file-preview').innerHTML = previewHtml;
-                };
-                reader.readAsDataURL(file);
-                previewHtml += '<div class="file-preview" style="width: 80px; height: 80px; background-color: #f8f9fa; display: flex; align-items: center; justify-content: center;">Loading...</div></div>';
-            } else {
-                previewHtml += '<div class="file-preview" style="width: 80px; height: 80px; background-color: #f8f9fa; display: flex; align-items: center; justify-content: center;"><i class="bi bi-file-image"></i></div></div>';
+            // Remove placeholder text if it exists
+            const placeholder = fileInputsContainer.querySelector('.text-center.text-muted');
+            if (placeholder) {
+                placeholder.remove();
             }
             
-            fileItem.innerHTML = previewHtml + `
-                <div class="flex-grow-1 mr-3">
-                    <div class="font-weight-medium truncate" style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${file.name}">${file.name}</div>
-                    <div class="text-sm text-muted">${fileSize} KB</div>
+            const fileGroup = document.createElement('div');
+            fileGroup.className = 'file-input-group mb-3 p-3 border rounded';
+            fileGroup.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">
+                        <i class="bi bi-${type === 'image' ? 'image' : 'camera-video'}"></i> 
+                        ${type.charAt(0).toUpperCase() + type.slice(1)} File
+                    </h6>
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeFileInput(this)">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </div>
-                <button type="button" class="btn btn-danger btn-sm remove-file" data-index="${selectedFiles.length - 1}">
-                    <i class="bi bi-trash"></i>
-                </button>
+                <input type="file" 
+                       class="form-control mb-2" 
+                       name="${config.name}[]" 
+                       accept="${config.accept}"
+                       id="${inputId}">
+                <div class="form-text">
+                    Maximum ${config.maxFiles} ${type}s, ${config.maxSize}MB each. 
+                    Allowed: ${config.allowedExtensions.join(', ').toUpperCase()}
+                </div>
+                <div class="file-preview mt-2" id="preview_${inputId}"></div>
             `;
             
-            fileList.appendChild(fileItem);
+            fileInputsContainer.appendChild(fileGroup);
             
-            // Add event listener to remove button
-            fileItem.querySelector('.remove-file').addEventListener('click', function() {
-                const index = parseInt(this.dataset.index);
-                // Remove file from array
-                selectedFiles.splice(index, 1);
-                // Remove from UI
-                fileItem.remove();
-                // Update indexes for remaining files
-                updateFileIndexes();
-                // Update button state
-                updateSubmitButton();
-                // Enable add button if we removed below the limit
-                if (selectedFiles.length < MAX_FILES) {
-                    addFilesBtn.disabled = false;
-                    addFilesBtn.classList.remove('btn-outline-secondary');
-                    addFilesBtn.classList.add('btn-outline-primary');
+            // Add event listeners
+            const fileInput = fileGroup.querySelector('input[type="file"]');
+            fileInput.addEventListener('change', function() {
+                validateAndPreviewFile(this, type, config);
+            });
+            
+            // Hide modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('fileTypeModal'));
+            modal.hide();
+        };
+        
+        // Remove file input function
+        window.removeFileInput = function(button) {
+            const fileGroup = button.closest('.file-input-group');
+            fileGroup.remove();
+            
+            // Show placeholder if no files left
+            const remainingFiles = fileInputsContainer.querySelectorAll('.file-input-group');
+            if (remainingFiles.length === 0) {
+                fileInputsContainer.innerHTML = `
+                    <div class="text-center text-muted mb-3">
+                        <p class="mb-2">No files added yet</p>
+                        <small>Click "Add File" to start uploading content</small>
+                    </div>
+                `;
+            }
+        };
+        
+        // Validate and preview file
+        function validateAndPreviewFile(input, type, config) {
+            const files = input.files;
+            const previewDiv = document.getElementById(`preview_${input.id}`);
+            previewDiv.innerHTML = '';
+            
+            if (files.length === 0) return;
+            
+            // Check total files for this type
+            const existingFiles = document.querySelectorAll(`input[name="${config.name}[]"]`);
+            let totalFiles = 0;
+            existingFiles.forEach(input => {
+                totalFiles += input.files.length;
+            });
+            
+            if (totalFiles > config.maxFiles) {
+                alert(`Maximum ${config.maxFiles} ${type} files allowed in total`);
+                input.value = '';
+                return;
+            }
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                
+                // Check file size
+                if (file.size > config.maxSize * 1024 * 1024) {
+                    alert(`File "${file.name}" exceeds ${config.maxSize}MB limit`);
+                    input.value = '';
+                    return;
                 }
-            });
+                
+                // Check file extension
+                const fileExtension = file.name.split('.').pop().toLowerCase();
+                if (!config.allowedExtensions.includes(fileExtension)) {
+                    alert(`File "${file.name}" is not an allowed ${type} type. Allowed: ${config.allowedExtensions.join(', ').toUpperCase()}`);
+                    input.value = '';
+                    return;
+                }
+                
+                // Create preview
+                const previewItem = document.createElement('div');
+                previewItem.className = 'preview-item mb-2 p-2 bg-light rounded';
+                previewItem.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-${type === 'image' ? 'image' : 'camera-video'} me-2"></i>
+                        <div>
+                            <div class="fw-bold">${file.name}</div>
+                            <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
+                        </div>
+                    </div>
+                `;
+                previewDiv.appendChild(previewItem);
+            }
         }
         
-        // Update file indexes after removal
-        function updateFileIndexes() {
-            const fileItems = fileList.querySelectorAll('.border.rounded');
-            fileItems.forEach((item, index) => {
-                item.dataset.index = index;
-                item.querySelector('.remove-file').dataset.index = index;
-            });
-        }
-        
-        // Handle file selection
-        function handleFiles(files) {
-            // Check how many files we can still add
-            const remainingSlots = MAX_FILES - selectedFiles.length;
-            let filesToAdd = Array.from(files).slice(0, remainingSlots);
+        // File validation function
+        function validateFiles() {
+            const imageInputs = document.querySelectorAll('input[name="image_files[]"]');
+            const videoInputs = document.querySelectorAll('input[name="video_files[]"]');
             
-            // Validate file sizes and types
-            filesToAdd = filesToAdd.filter(file => {
-                if (file.size > MAX_FILE_SIZE) {
-                    alert(`File ${file.name} exceeds 5MB limit`);
+            let totalImages = 0;
+            let totalVideos = 0;
+            
+            // Count total files
+            imageInputs.forEach(input => {
+                totalImages += input.files.length;
+            });
+            
+            videoInputs.forEach(input => {
+                totalVideos += input.files.length;
+            });
+            
+            if (totalImages > fileTypes.image.maxFiles) {
+                alert(`Maximum ${fileTypes.image.maxFiles} images allowed in total`);
+                return false;
+            }
+            
+            if (totalVideos > fileTypes.video.maxFiles) {
+                alert(`Maximum ${fileTypes.video.maxFiles} videos allowed in total`);
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // Initialize modal
+        const fileTypeModal = createFileTypeModal();
+        
+        // Add file button event listener
+        addFileBtn.addEventListener('click', function() {
+            fileTypeModal.show();
+        });
+        
+        // Form validation
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const title = document.getElementById('title').value.trim();
+                if (!title) {
+                    e.preventDefault();
+                    alert('Please enter a share title');
                     return false;
                 }
-                return true;
+                
+                // Check if at least one content type is provided
+                const hasImages = document.querySelectorAll('input[name="image_files[]"]').length > 0;
+                const hasVideos = document.querySelectorAll('input[name="video_files[]"]').length > 0;
+                const hasText = document.querySelector('textarea[name="text_content"]').value.trim();
+                
+                let hasFiles = false;
+                if (hasImages) {
+                    document.querySelectorAll('input[name="image_files[]"]').forEach(input => {
+                        if (input.files.length > 0) hasFiles = true;
+                    });
+                }
+                if (hasVideos) {
+                    document.querySelectorAll('input[name="video_files[]"]').forEach(input => {
+                        if (input.files.length > 0) hasFiles = true;
+                    });
+                }
+                
+                if (!hasFiles && !hasText) {
+                    e.preventDefault();
+                    alert('Please provide at least one type of content (images, videos, or text)');
+                    return false;
+                }
+                
+                if (!validateFiles()) {
+                    e.preventDefault();
+                    return false;
+                }
             });
-            
-            // Add valid files
-            filesToAdd.forEach(file => {
-                selectedFiles.push(file);
-                displayFile(file);
-            });
-            
-            // Disable add button if we reached the limit
-            if (selectedFiles.length >= MAX_FILES) {
-                addFilesBtn.disabled = true;
-                addFilesBtn.classList.remove('btn-outline-primary');
-                addFilesBtn.classList.add('btn-outline-secondary');
-            }
-            
-            // Update submit button
-            updateSubmitButton();
         }
-        
-        // Trigger file input when add button is clicked
-        addFilesBtn.addEventListener('click', function() {
-            fileInput.click();
-        });
-        
-        // Handle file input change
-        fileInput.addEventListener('change', function() {
-            if (this.files.length > 0) {
-                handleFiles(this.files);
-                // Reset file input to allow selecting the same files again
-                this.value = '';
-            }
-        });
-        
-        // Create a custom FileList from selected files
-        function createCustomFileList(files) {
-            const dataTransfer = new DataTransfer();
-            files.forEach(file => dataTransfer.items.add(file));
-            return dataTransfer.files;
-        }
-        
-        // Modify form submission to include all selected files
-        document.querySelector('form').addEventListener('submit', function(e) {
-            // Replace the file input's files with our selected files
-            fileInput.files = createCustomFileList(selectedFiles);
-            // Form will submit normally with all files
-        });
     });
 </script>
 {% endblock %}

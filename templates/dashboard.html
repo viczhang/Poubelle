@@ -4,9 +4,13 @@
 
 {% block content %}
 <div class="d-flex flex-column gap-3 mb-4">
-    <h1 class="h2 mb-5">Your Image Shares</h1>
+    {% if is_admin %}
+        <h1 class="h2 mb-5">Admin Dashboard - All Image Shares ({{ shares|length }} total)</h1>
+    {% else %}
+        <h1 class="h2 mb-5">Your Image Shares</h1>
+    {% endif %}
     <div class="d-flex gap-2">
-        <a href="{{ url_for('upload') }}" class="btn btn-primary">Create New Share</a>
+        <a href="{{ url_for('admin.upload') }}" class="btn btn-primary">Create New Share</a>
     </div>
     <!-- 简单的HTML表单，直接提交到测试路由 -->
     <div class="bg-danger text-white p-4 my-3">
@@ -42,8 +46,8 @@
                 <h5 class="card-title">{{ share.title }}</h5>
                 <p class="card-text">Created: {{ share.created_at }}<br>Images: {{ share.images | length }} | Views: {{ share.views_count }}</p>
                 <div class="d-grid gap-2">
-                    <a href="{{ url_for('manage', share_id=share.id) }}" class="btn btn-outline-primary">Manage</a>
-                    <a href="{{ url_for('view_share', share_id=share.share_id) }}" class="btn btn-outline-secondary" target="_blank">View</a>
+                    <a href="{{ url_for('admin.manage', share_id=share.id) }}" class="btn btn-outline-primary">Manage</a>
+                    <a href="{{ url_for('share.view', share_id=share.share_id) }}" class="btn btn-outline-secondary" target="_blank">View</a>
                 </div>
             </div>
         </div>
@@ -52,7 +56,11 @@
 </div>
 {% else %}
 <div class="alert alert-info">
-    <p>You haven't created any image shares yet. <a href="{{ url_for('upload') }}">Create one now</a>.</p>
+    {% if is_admin %}
+              <p>No image shares have been created yet.</p>
+          {% else %}
+              <p>You haven't created any image shares yet. <a href="{{ url_for('admin.upload') }}">Create one now</a>.</p>
+          {% endif %}
 </div>
 {% endif %}
 
@@ -126,7 +134,7 @@ window.onload = function() {
                 // Create a form and submit it
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.action = '{{ url_for("dashboard") }}';
+                form.action = '{{ url_for('admin.dashboard') }}';
                 
                 const actionInput = document.createElement('input');
                 actionInput.type = 'hidden';

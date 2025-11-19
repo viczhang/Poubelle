@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Successful - {{ config.SITE_TITLE }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="alert alert-success mt-4">
+                <h4 class="alert-heading">Upload Successful!</h4>
+                <p>Your share has been created successfully.</p>
+                <hr>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="me-2">Share URL:</span>
+                    <div class="input-group flex-1">
+                        <input type="text" class="form-control" id="shareUrl" value="{{ share_url }}" readonly>
+                        <button class="btn btn-outline-secondary" type="button" onclick="copyShareUrl(this)">Copy URL</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-center mt-4">
+                <a href="{{ url_for('upload') }}" class="btn btn-primary me-2">Create Another Share</a>
+                <a href="{{ share_url }}" class="btn btn-outline-primary" target="_blank">View Share</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyShareUrl(button) {
+    const input = document.getElementById('shareUrl');
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(input.value).then(() => {
+            button.textContent = 'Copied!';
+            setTimeout(() => button.textContent = 'Copy URL', 2000);
+        });
+    } else {
+        input.select();
+        document.execCommand('copy');
+        button.textContent = 'Copied!';
+        setTimeout(() => button.textContent = 'Copy URL', 2000);
+    }
+}
+</script>
+{% endblock %}

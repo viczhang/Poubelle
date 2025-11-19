@@ -15,14 +15,55 @@
         border-radius: 4px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
+    .video-container {
+        margin-bottom: 20px;
+    }
+    .video-container video {
+        width: 100%;
+        border-radius: 4px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .text-content {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
 </style>
 
 <div class="container">
     <h1 class="h2 text-center mb-4">{{ share.title }}</h1>
     
+    <!-- Text Content Section -->
+    {% if share.text_content %}
+    <div class="text-content">
+        {{ share.text_content }}
+    </div>
+    {% endif %}
+    
+    <!-- Videos Section -->
+    {% if videos %}
+    <div class="videos-section">
+        <div class="row">
+            {% for video in videos %}
+            <div class="col-md-6 video-container">
+                <video controls>
+                    <source src="{{ url_for('static', filename='uploads/' + video.filename) }}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Images Section -->
+    {% if images %}
     <div class="gallery">
         <div class="row">
-            {% for image in share.images %}
+            {% for image in images %}
             <div class="col-md-4 gallery-item">
                 <a href="{{ url_for('static', filename='uploads/' + image.filename) }}" target="_blank">
                     <img src="{{ url_for('static', filename='uploads/' + image.filename) }}" alt="{{ image.original_filename }}" class="img-fluid">
@@ -31,5 +72,13 @@
             {% endfor %}
         </div>
     </div>
+    {% endif %}
+    
+    <!-- Empty State -->
+    {% if not images and not videos and not share.text_content %}
+    <div class="alert alert-info text-center">
+        <p>No content in this collection.</p>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
