@@ -1,37 +1,81 @@
-version: '3'
+version: '3.8'
 
 services:
   poubelle:
     build: .
     container_name: poubelle
-    restart: always
+    restart: unless-stopped
     ports:
       - "5000:5000"
     volumes:
-      - ./static/uploads:/app/static/uploads
-      - ./imageshare.db:/app/imageshare.db
+      # Persistent data volumes
+      - poubelle_uploads:/app/app/static/uploads
+      - poubelle_db:/app/imageshare.db
     environment:
+      # Flask configuration
       FLASK_ENV: production
-      # Set admin password via environment; defaults to 'admin' if not provided
+      FLASK_DEBUG: 0
+      
+      # Security configuration
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-this}
+      
+      # Admin configuration
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
-      # Set site title via environment; defaults to 'Poubelle' if not provided
+      
+      # Site configuration
       SITE_TITLE: ${SITE_TITLE:-Poubelle}
-      # Set maximum shares limit via environment; defaults to 100 if not provided
       MAX_SHARES: ${MAX_SHARES:-100}
-      # Ensure Flask is aware it's behind a proxy
+      
+      # Proxy configuration for production
       PROXYFIX_FORCE_ENV: 'true'
-      # Set trusted proxies
-      TRUSTED_PROXIES: '172.16.0.0/12,192.168.0.0/16'
-    command: python run.py
-    networks:
-      - caddy_default
-    # Healthcheck to ensure the service is running
+      TRUSTED_PROXIES: '172.16.0.0/12,192.168.0.0/16,10.0.0.0/8'
+      
+      # Gunicorn configuration (if you switch to gunicorn)
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+    # Health check
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
+    
+    # Logging configuration
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    networks:
+      - caddy_default
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # User mapping (should match Dockerfile user)
+    user: "1000:1000"
 
 networks:
   caddy_default:
     external: true
+
+# Named volumes for data persistence
+volumes:
+  poubelle_uploads:
+    driver: local
+  poubelle_db:
+    driver: local

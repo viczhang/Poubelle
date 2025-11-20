@@ -39,62 +39,74 @@ A simple web application for securely sharing images with password protection.
 
 ## Security Note
 
-## Docker Compose Deployment
+## Production Deployment
 
-Use Docker Compose to run the app on your server:
+### Quick Deploy with Docker Compose
 
-1. Create an `.env` file next to `docker-compose.yml` (optional but recommended):
+1. **Use the deployment script:**
    ```bash
-   echo "ADMIN_PASSWORD=SuperSecure!123" > .env
-   echo "SITE_TITLE=MyCustomSiteName" >> .env
+   ./deploy.sh
    ```
 
-2. Review `docker-compose.yml`:
-   - The file already includes environment variables with default values:
-     - `ADMIN_PASSWORD`: Defaults to 'admin' if not set
-     - `SITE_TITLE`: Defaults to 'Poubelle' if not set
-
-3. You can customize these variables directly in the `.env` file or by setting environment variables when running Docker Compose:
+2. **Manual deployment:**
    ```bash
-   SITE_TITLE="MyCustomGallery" docker-compose up -d
+   # Copy environment template
+   cp .env.example .env
+   
+   # Edit .env with your settings (especially SECRET_KEY!)
+   nano .env
+   
+   # Build and start
+   docker-compose up -d
    ```
 
-4. When deployed, the site will use the custom title set in your environment variables.
-   - The service exposes `5000` on the host
-   - Persists data via volumes:
-     - `./static/uploads:/app/static/uploads`
-     - `./imageshare.db:/app/imageshare.db`
-   - Supports admin password via environment:
-     ```yaml
-     environment:
-       FLASK_ENV: production
-       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
-     command: python run.py
-     ```
+3. **Access the application:**
+   - Application: http://localhost:5000
+   - Admin panel: http://localhost:5000/admin
+   - Health check: http://localhost:5000/health
 
-3. Build and start:
-   ```bash
-   docker compose up -d --build
-   ```
+### Production Features
 
-4. Check logs and status:
-   ```bash
-   docker compose logs -f
-   docker compose ps
-   ```
+- **Security**: Non-root user, security headers, resource limits
+- **Performance**: Gunicorn WSGI server with configurable workers
+- **Monitoring**: Health checks, logging, resource monitoring
+- **Persistence**: Docker volumes for uploads and database
+- **Scalability**: Ready for reverse proxy (Caddy, Nginx, Traefik)
 
-5. Access the app:
-   - `http://<your-server-ip>:5000` or your domain if reverse-proxied
+### Detailed Deployment Guide
 
-6. Stop or update:
-   ```bash
-   docker compose down
-   docker compose pull && docker compose up -d
-   ```
+See [DEPLOYMENT.md](DEPLOYMENT.md) for:
+- Complete configuration options
+- Reverse proxy setup
+- Backup and restore procedures
+- Security best practices
+- Troubleshooting guide
 
-### Notes
-- The container’s default admin credentials are `admin` / `admin` unless `ADMIN_PASSWORD` is set.
-- The container now uses `run.py` (SQLAlchemy app) by default for persistence and avoids `app.py`’s reinitialization behavior.
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SECRET_KEY` | `dev-key-for-testing` | **IMPORTANT**: Set a secure random key for production |
+| `ADMIN_PASSWORD` | `admin` | Admin user password |
+| `SITE_TITLE` | `Poubelle` | Site title shown in UI |
+| `MAX_SHARES` | `100` | Maximum number of shares allowed |
+| `GUNICORN_WORKERS` | `4` | Number of worker processes |
+
+### Docker Compose (Development)
+
+For development, you can still use the simpler setup:
+
+```bash
+# Create an `.env` file (optional):
+echo "ADMIN_PASSWORD=SuperSecure!123" > .env
+echo "SITE_TITLE=MyCustomSiteName" >> .env
+
+# Build and start:
+docker compose up -d --build
+
+# Check logs:
+docker compose logs -f
+```
 
 ## Environment Variables
 

@@ -54,6 +54,17 @@ def create_app():
         from flask import make_response
         return make_response('', 204)
     
+    # Health check endpoint for Docker
+    @app.route('/health')
+    def health_check():
+        from flask import jsonify
+        try:
+            # Test database connection
+            db.session.execute('SELECT 1')
+            return jsonify({'status': 'healthy', 'database': 'connected'}), 200
+        except Exception as e:
+            return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+    
     with app.app_context():
         db.create_all()
         
