@@ -5,6 +5,8 @@ from flask_login import LoginManager
 from werkzeug.middleware.proxy_fix import ProxyFix
 from sqlalchemy import text
 
+__version__ = '1.0.0'
+
 db = SQLAlchemy()
 login_manager = LoginManager()
 
