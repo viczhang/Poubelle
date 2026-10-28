@@ -3,10 +3,10 @@ version: '3.8'
 services:
   poubelle:
     build: .
-    container_name: poubelle
+    container_name: 1_3of_us
     restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "5001:5000"
     volumes:
       # Persistent data volumes
       - poubelle_uploads:/app/app/static/uploads
@@ -32,7 +32,7 @@ services:
       
       # Gunicorn configuration (if you switch to gunicorn)
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
-      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-300}
     
     # Resource limits
     deploy:

@@ -8,6 +8,26 @@ from app import db
 
 admin = Blueprint('admin', __name__)
 
+IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+VIDEO_EXTENSIONS = {'mp4', 'webm', 'avi', 'mov', 'mkv', 'm4v'}
+MAX_IMAGE_SIZE = 5 * 1024 * 1024    # 5MB
+MAX_VIDEO_SIZE = 50 * 1024 * 1024   # 50MB
+MAX_TEXT_SIZE = 5 * 1024 * 1024     # 5MB
+MAX_ATTACHMENTS = 10
+
+
+def get_file_type(filename):
+    """Detect whether a filename is an allowed image or video."""
+    if not filename or '.' not in filename:
+        return None
+    ext = filename.rsplit('.', 1)[1].lower()
+    if ext in IMAGE_EXTENSIONS:
+        return 'image'
+    if ext in VIDEO_EXTENSIONS:
+        return 'video'
+    return None
+
+
 def allowed_file(filename, file_type='image'):
     """Check if file extension is allowed based on file type."""
     if '.' not in filename:
@@ -16,9 +36,9 @@ def allowed_file(filename, file_type='image'):
     ext = filename.rsplit('.', 1)[1].lower()
     
     if file_type == 'image':
-        return ext in {'png', 'jpg', 'jpeg', 'gif'}
+        return ext in IMAGE_EXTENSIONS
     elif file_type == 'video':
-        return ext in {'mp4', 'webm', 'avi', 'mov'}
+        return ext in VIDEO_EXTENSIONS
     elif file_type == 'text':
         return ext in {'txt', 'md', 'json', 'xml', 'csv'}
     
@@ -91,54 +111,58 @@ def delete_all_shares():
 @admin.route('/upload', methods=['GET', 'POST'])
 def upload():
     if request.method == 'POST':
-        title = request.form.get('title')
-        password = request.form.get('password')
+        title = request.form.get('title', '').strip()
+        password = request.form.get('share_password') or request.form.get('password')
         text_content = request.form.get('text_content', '').strip()
         
         if not title:
             flash('Title is required')
             return redirect(url_for('admin.upload'))
         
-        # Get files from different input types
-        image_files = request.files.getlist('image_files[]')
-        video_files = request.files.getlist('video_files[]')
+        # Validate text size (max 5MB)
+        if text_content and len(text_content.encode('utf-8')) > MAX_TEXT_SIZE:
+            flash('Text content exceeds 5MB limit')
+            return redirect(url_for('admin.upload'))
         
-        # Filter out empty files
-        image_files = [f for f in image_files if f and f.filename]
-        video_files = [f for f in video_files if f and f.filename]
+        # Support unified 'files' input as well as legacy 'image_files[]' / 'video_files[]' / 'images'
+        raw_files = (
+            request.files.getlist('files')
+            + request.files.getlist('image_files[]')
+            + request.files.getlist('video_files[]')
+            + request.files.getlist('images')
+        )
+        attachments = [f for f in raw_files if f and f.filename]
         
         # Validate content requirements
-        if not image_files and not video_files and not text_content:
-            flash('Please provide at least one type of content (images, videos, or text)')
+        if not attachments and not text_content:
+            flash('Please provide at least one attachment (photo/video) or text')
             return redirect(url_for('admin.upload'))
         
-        # Validate file limits
-        if len(image_files) > 10:
-            flash('Maximum 10 images allowed per share')
+        # Validate total attachment limit (max 10 total)
+        if len(attachments) > MAX_ATTACHMENTS:
+            flash(f'Maximum {MAX_ATTACHMENTS} attachments allowed per share')
             return redirect(url_for('admin.upload'))
         
-        if len(video_files) > 10:
-            flash('Maximum 10 videos allowed per share')
-            return redirect(url_for('admin.upload'))
-        
-        # Validate file sizes and types
-        for file in image_files:
-            if file and allowed_file(file.filename, 'image'):
-                file.seek(0, os.SEEK_END)
-                file_size = file.tell()
-                file.seek(0)
-                if file_size > 5 * 1024 * 1024:  # 5MB limit
-                    flash(f'Image {file.filename} exceeds 5MB limit')
-                    return redirect(url_for('admin.upload'))
-        
-        for file in video_files:
-            if file and allowed_file(file.filename, 'video'):
-                file.seek(0, os.SEEK_END)
-                file_size = file.tell()
-                file.seek(0)
-                if file_size > 10 * 1024 * 1024:  # 10MB limit
-                    flash(f'Video {file.filename} exceeds 10MB limit')
-                    return redirect(url_for('admin.upload'))
+        # Validate each attachment's type and size
+        validated_files = []
+        for file in attachments:
+            ftype = get_file_type(file.filename)
+            if not ftype:
+                flash(f'Unsupported file type for {file.filename}')
+                return redirect(url_for('admin.upload'))
+            
+            file.seek(0, os.SEEK_END)
+            file_size = file.tell()
+            file.seek(0)
+            
+            if ftype == 'image' and file_size > MAX_IMAGE_SIZE:
+                flash(f'Image {file.filename} exceeds 5MB limit')
+                return redirect(url_for('admin.upload'))
+            if ftype == 'video' and file_size > MAX_VIDEO_SIZE:
+                flash(f'Video {file.filename} exceeds 50MB limit')
+                return redirect(url_for('admin.upload'))
+            
+            validated_files.append((file, ftype))
         
         # Create share with text content if provided
         user_id = current_user.id if current_user.is_authenticated else None
@@ -149,37 +173,20 @@ def upload():
         db.session.add(share)
         db.session.flush()
         
-        # Process image files
-        for file in image_files:
-            if file and allowed_file(file.filename, 'image'):
-                filename = secure_filename(file.filename)
-                unique_filename = f"{uuid.uuid4()}_{filename}"
-                file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
-                file.save(file_path)
-                
-                image = Image(
-                    filename=unique_filename,
-                    original_filename=filename,
-                    share_id=share.id,
-                    file_type='image'
-                )
-                db.session.add(image)
-        
-        # Process video files
-        for file in video_files:
-            if file and allowed_file(file.filename, 'video'):
-                filename = secure_filename(file.filename)
-                unique_filename = f"{uuid.uuid4()}_{filename}"
-                file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
-                file.save(file_path)
-                
-                video = Image(
-                    filename=unique_filename,
-                    original_filename=filename,
-                    share_id=share.id,
-                    file_type='video'
-                )
-                db.session.add(video)
+        # Save attachments
+        for file, ftype in validated_files:
+            filename = secure_filename(file.filename)
+            unique_filename = f"{uuid.uuid4()}_{filename}"
+            file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
+            file.save(file_path)
+            
+            attachment = Image(
+                filename=unique_filename,
+                original_filename=filename,
+                share_id=share.id,
+                file_type=ftype
+            )
+            db.session.add(attachment)
         
         db.session.commit()
         share_url = url_for('share.view', share_id=share.share_id, _external=True, _scheme='https')
@@ -217,6 +224,12 @@ def manage(share_id):
                 share.title = title
             if password:
                 share.set_password(password)
+            if 'text_content' in request.form:
+                new_text = request.form.get('text_content', '').strip()
+                if len(new_text.encode('utf-8')) > MAX_TEXT_SIZE:
+                    flash('Text content exceeds 5MB limit')
+                    return redirect(url_for('admin.manage', share_id=share.id))
+                share.text_content = new_text or None
             
             db.session.commit()
             flash('Share updated successfully')

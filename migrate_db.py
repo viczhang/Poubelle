@@ -1,4 +1,5 @@
 import os
+from sqlalchemy import inspect, text
 from app import create_app, db
 from app.models import User
 
@@ -9,6 +10,20 @@ app = create_app()
 with app.app_context():
     # Create all database tables
     db.create_all()
+
+    # Ensure newer columns exist when migrating an older SQLite database
+    inspector = inspect(db.engine)
+    if 'image_share' in inspector.get_table_names():
+        columns = [col['name'] for col in inspector.get_columns('image_share')]
+        if 'text_content' not in columns:
+            db.session.execute(text('ALTER TABLE image_share ADD COLUMN text_content TEXT'))
+            db.session.commit()
+
+    if 'image' in inspector.get_table_names():
+        columns = [col['name'] for col in inspector.get_columns('image')]
+        if 'file_type' not in columns:
+            db.session.execute(text("ALTER TABLE image ADD COLUMN file_type VARCHAR(20) DEFAULT 'image'"))
+            db.session.commit()
 
     # Create admin user if not exists
     if not User.query.filter_by(username='admin').first():

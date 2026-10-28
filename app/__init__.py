@@ -5,7 +5,7 @@ from flask_login import LoginManager
 from werkzeug.middleware.proxy_fix import ProxyFix
 from sqlalchemy import text
 
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -17,6 +17,7 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
     app.config['SITE_TITLE'] = os.environ.get('SITE_TITLE', 'Poubelle')
+    app.config['MAX_CONTENT_LENGTH'] = 550 * 1024 * 1024  # 550MB max request payload
     
     # Configure ProxyFix to get real client IP addresses behind Caddy
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)

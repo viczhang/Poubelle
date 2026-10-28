@@ -302,7 +302,7 @@ def test_delete_all():
 def upload():
     if request.method == 'POST':
         title = request.form.get('title')
-        password = request.form.get('password')
+        password = request.form.get('share_password') or request.form.get('password')
         
         if not title:
             flash('Title is required')
@@ -322,23 +322,38 @@ def upload():
             if key.startswith('video_files['):
                 video_files.extend(request.files.getlist(key))
         
+        # Collect any unified 'files' inputs as well
+        for f in request.files.getlist('files'):
+            if f and f.filename:
+                ext = f.filename.rsplit('.', 1)[-1].lower() if '.' in f.filename else ''
+                if ext in {'mp4', 'webm', 'avi', 'mov', 'mkv', 'm4v'}:
+                    video_files.append(f)
+                else:
+                    image_files.append(f)
+        
+        image_files = [f for f in image_files if f and f.filename]
+        video_files = [f for f in video_files if f and f.filename]
         text_content = request.form.get('text_content', '').strip()
         
         # Check if any content was provided
-        has_images = any(image_files) and image_files[0].filename != ''
-        has_videos = any(video_files) and video_files[0].filename != ''
+        has_images = len(image_files) > 0
+        has_videos = len(video_files) > 0
         has_text = bool(text_content)
         
         if not has_images and not has_videos and not has_text:
             flash('Please provide at least one type of content (images, videos, or text)')
             return redirect(url_for('upload'))
         
+        if has_text and len(text_content.encode('utf-8')) > 5 * 1024 * 1024:
+            flash('Text content exceeds 5MB limit')
+            return redirect(url_for('upload'))
+        
+        if len(image_files) + len(video_files) > 10:
+            flash('Maximum 10 attachments allowed per share')
+            return redirect(url_for('upload'))
+        
         # Validate image files
         if has_images:
-            if len(image_files) > 10:
-                flash('Maximum 10 images allowed per share')
-                return redirect(url_for('upload'))
-            
             for file in image_files:
                 if file and allowed_file(file.filename):
                     file.seek(0, os.SEEK_END)
@@ -351,18 +366,14 @@ def upload():
         
         # Validate video files
         if has_videos:
-            if len(video_files) > 10:
-                flash('Maximum 10 videos allowed per share')
-                return redirect(url_for('upload'))
-            
             for file in video_files:
                 if file and allowed_file(file.filename):
                     file.seek(0, os.SEEK_END)
                     file_size = file.tell()
                     file.seek(0)
                     
-                    if file_size > 10 * 1024 * 1024:  # 10MB limit
-                        flash(f'Video {file.filename} exceeds 10MB limit')
+                    if file_size > 50 * 1024 * 1024:  # 50MB limit
+                        flash(f'Video {file.filename} exceeds 50MB limit')
                         return redirect(url_for('upload'))
         
         # Create share
