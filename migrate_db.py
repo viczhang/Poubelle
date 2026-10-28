@@ -1,14 +1,24 @@
+import os
 from app import create_app, db
-from app.models import AccessLog, ImageShare
+from app.models import User
 
+# This script needs to run within the Flask application context.
+# Create a dummy app instance to get the context.
 app = create_app()
 
 with app.app_context():
-    # Update database schema
+    # Create all database tables
     db.create_all()
-    
-    # For existing shares with UUID share_id longer than 3 characters,
-    # we don't need to change them as they will continue to work
-    print("Database migration completed successfully!")
-    print("Updated schema to support short share IDs (3 characters).")
-    print("New shares will automatically use short IDs, while existing shares remain unchanged.")
+
+    # Create admin user if not exists
+    if not User.query.filter_by(username='admin').first():
+        admin = User(username='admin')
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'admin')
+        admin.set_password(admin_password)
+        db.session.add(admin)
+        db.session.commit()
+        print("Admin user created.")
+    else:
+        print("Admin user already exists.")
+
+print("Database initialized and admin user checked.")

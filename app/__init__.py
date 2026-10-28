@@ -3,6 +3,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from werkzeug.middleware.proxy_fix import ProxyFix
+from sqlalchemy import text
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -10,7 +11,7 @@ login_manager = LoginManager()
 def create_app():
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-for-testing')
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///imageshare.db'
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////app/data/imageshare.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
     app.config['SITE_TITLE'] = os.environ.get('SITE_TITLE', 'Poubelle')
@@ -60,7 +61,8 @@ def create_app():
         from flask import jsonify
         try:
             # Test database connection
-            db.session.execute('SELECT 1')
+            from app.models import User # Import User model locally for health check
+            User.query.first()
             return jsonify({'status': 'healthy', 'database': 'connected'}), 200
         except Exception as e:
             return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
@@ -68,13 +70,6 @@ def create_app():
     with app.app_context():
         db.create_all()
         
-        # Create admin user if not exists
-        from app.models import User
-        if not User.query.filter_by(username='admin').first():
-            admin = User(username='admin')
-            admin_password = os.environ.get('ADMIN_PASSWORD', 'admin')
-            admin.set_password(admin_password)
-            db.session.add(admin)
-            db.session.commit()
+
     
     return app

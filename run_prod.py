@@ -34,6 +34,15 @@ def run_production():
     bind = '0.0.0.0:5000'
     
     # Run with gunicorn
+    app = create_app() # Create the Flask app instance
+    
+    # Gunicorn expects a string with the module:app_variable
+    # Since we have create_app() in app/__init__.py, and run_prod.py is in /app,
+    # we need to reference it as 'app:app' after we create the app instance in this module.
+    # We will temporarily add 'app' to global scope for Gunicorn to find it.
+    import __main__
+    __main__.app = app
+
     from gunicorn.app.wsgiapp import run
     sys.argv = [
         'gunicorn',
@@ -44,7 +53,7 @@ def run_production():
         '--access-logfile', '-',
         '--error-logfile', '-',
         '--log-level', 'info',
-        'run:app'
+        'wsgi:app' # Reference the 'app' variable in wsgi.py
     ]
     run()
 

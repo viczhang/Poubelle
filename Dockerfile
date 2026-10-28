@@ -21,6 +21,9 @@ COPY . .
 # Create uploads directory with proper permissions
 RUN mkdir -p app/static/uploads && chmod 755 app/static/uploads && chown -R appuser:appuser /app
 
+# Create data directory for database with proper permissions
+RUN mkdir -p /app/data && chmod 755 /app/data && chown -R appuser:appuser /app/data
+
 # Switch to non-root user
 USER appuser
 

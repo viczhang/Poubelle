@@ -13,7 +13,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 # Configuration
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-key-for-testing'
-app.config['DATABASE'] = os.path.join(os.path.dirname(__file__), 'imageshare.db')
+app.config['DATABASE'] = os.path.join('/app/data', 'imageshare.db')
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'webm', 'avi', 'mov'}
 # Set maximum shares limit via environment; defaults to 100 if not provided
